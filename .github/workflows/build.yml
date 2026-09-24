@@ -2,70 +2,112 @@ name: Build
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]        # push a tag like v0.2.0 for a versioned release
+    branches: [main]
+    tags: ['v*']
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:       # lets you trigger a build manually from the Actions tab
+    branches: [main]
+  workflow_dispatch:
 
-# Needed so the workflow can create/update releases.
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: megacobble-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
+    name: Build Fabric JAR
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
           cache: gradle
 
-      # gradle.properties pins a machine-specific JDK path for local Windows builds; drop it so
-      # Gradle uses this runner's JDK 21 (provided by setup-java via JAVA_HOME).
-      - name: Use the runner's JDK
-        run: sed -i '/org.gradle.java.home/d' gradle.properties
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
       - name: Build
-        run: ./gradlew build --no-daemon --stacktrace
+        run: bash ./gradlew build --no-daemon --stacktrace --max-workers=2
 
-      - name: Locate the mod jar
-        id: jar
-        run: |
-          JAR=$(ls build/libs/megacobble-*.jar | grep -vE '\-(sources|dev)\.jar$' | head -n1)
-          echo "Built mod jar: $JAR"
-          cp "$JAR" megacobble-latest.jar
-          echo "versioned=$JAR" >> "$GITHUB_OUTPUT"
+      - name: Verify and collect installable JAR
+        run: python3 .github/scripts/prepare-artifact.py
 
-      # Every build (incl. PRs) leaves a downloadable artifact on the Actions run page.
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: megacobble-jar
-          path: build/libs/megacobble-*.jar
+          path: dist/megacobble-*.jar
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
 
-      # On a push to main: keep a rolling "latest" release whose asset is always the freshest jar.
-      # Stable link: https://github.com/<owner>/<repo>/releases/download/latest/megacobble-latest.jar
-      - name: Update rolling "latest" release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+  release:
+    name: Publish downloadable JAR
+    needs: build
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download verified JAR
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          tag_name: latest
-          name: Latest build (main)
-          prerelease: true
-          files: megacobble-latest.jar
+          name: megacobble-jar
+          path: dist
 
-      # On a version tag (v0.2.0, ...): a permanent versioned release with the versioned jar.
-      - name: Versioned release
+      - name: Update rolling latest release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          jars=(dist/megacobble-*.jar)
+          [[ ${#jars[@]} -eq 1 ]]
+          cp "${jars[0]}" megacobble-latest.jar
+          if gh api "repos/$GH_REPO/git/ref/tags/latest" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/latest" \
+              -f sha="$GITHUB_SHA" -F force=true
+          else
+            gh api --method POST "repos/$GH_REPO/git/refs" \
+              -f ref=refs/tags/latest -f sha="$GITHUB_SHA"
+          fi
+          printf 'Automatic Fabric build of commit `%s`. Requires Minecraft 1.21.1, Cobblemon 1.7.3, Fabric API and Fabric Language Kotlin.\n' "$GITHUB_SHA" > release-notes.md
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --title 'Latest build (main)' --prerelease --notes-file release-notes.md
+            gh release upload latest megacobble-latest.jar --clobber
+          else
+            gh release create latest megacobble-latest.jar --verify-tag \
+              --title 'Latest build (main)' --prerelease --notes-file release-notes.md
+          fi
+          printf '### Download\n[megacobble-latest.jar](https://github.com/%s/releases/download/latest/megacobble-latest.jar)\n' "$GH_REPO" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish versioned release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.jar.outputs.versioned }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          jars=(dist/megacobble-*.jar)
+          [[ ${#jars[@]} -eq 1 ]]
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # Existing version assets stay immutable; only add a missing asset.
+            assets=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')
+            if ! grep -Fxq "$(basename "${jars[0]}")" <<< "$assets"; then
+              gh release upload "$GITHUB_REF_NAME" "${jars[0]}"
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" "${jars[0]}" --verify-tag \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          printf '### Versioned release\n[%s](https://github.com/%s/releases/tag/%s)\n' "$GITHUB_REF_NAME" "$GH_REPO" "$GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"

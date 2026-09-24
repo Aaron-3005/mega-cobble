@@ -1,6 +1,6 @@
 # Mega Cobble
 
-[![Build](https://github.com/Ariaflare/mega-cobble/actions/workflows/build.yml/badge.svg)](https://github.com/Ariaflare/mega-cobble/actions/workflows/build.yml)
+[![Build](https://github.com/Aaron-3005/mega-cobble/actions/workflows/build.yml/badge.svg)](https://github.com/Aaron-3005/mega-cobble/actions/workflows/build.yml)
 
 A Fabric add-on that brings **Mega Evolution** to
 [Cobblemon](https://cobblemon.com/) — including a data-driven pipeline for adding
@@ -13,10 +13,16 @@ A Fabric add-on that brings **Mega Evolution** to
 
 ## Download
 
-- **[⬇ Latest jar](https://github.com/Ariaflare/mega-cobble/releases/download/latest/megacobble-latest.jar)**
+- **[⬇ Latest jar](https://github.com/Aaron-3005/mega-cobble/releases/download/latest/megacobble-latest.jar)**
   — `megacobble-latest.jar`, rebuilt on every push to `main`.
-- **[All releases](https://github.com/Ariaflare/mega-cobble/releases)** — tagged `v*` versions get a
+- **[All releases](https://github.com/Aaron-3005/mega-cobble/releases)** — tagged `v*` versions get a
   permanent jar.
+
+Every build also uploads the installable versioned JAR as the **megacobble-jar** artifact on its
+Actions run (retained for 30 days). Sources and development JARs are excluded. Use **Actions →
+Build → Run workflow** on `main` to rebuild and refresh the rolling latest download manually.
+Version tags must match `mod_version` in `gradle.properties`; existing versioned release assets
+are preserved when a workflow is rerun. Release downloads remain available after build artifacts expire.
 
 It's a Fabric **add-on**, so drop it in your `mods/` folder alongside its dependencies — it won't
 launch without them:
@@ -289,7 +295,7 @@ JDK 21 on your PATH, then:
 `mod_version` in `gradle.properties` is the single source of truth (jar name, in-mod version, and the
 GitHub release). **`tools/release.py`** bumps it, commits, and tags `vX.Y.Z`; pushing the tag triggers
 the GitHub Actions **versioned release**. (Pushes to `main` separately refresh the rolling
-[`latest`](https://github.com/Ariaflare/mega-cobble/releases) jar.)
+[`latest`](https://github.com/Aaron-3005/mega-cobble/releases) jar.)
 
 ```bash
 python tools/release.py                # show current version + recent tags

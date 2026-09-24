@@ -21,6 +21,8 @@ CLAUDE.local.md
 # --- fabric-loom / gradle build output ---
 .gradle/
 build/
+dist/
+__pycache__/
 out/
 classes/
 .loom-cache/
