@@ -16,6 +16,11 @@ import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
 import com.cobblemon.mod.common.net.messages.client.battle.BattleSwitchPokemonPacket;
 import com.cobblemon.mod.common.pokemon.FormData;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
@@ -65,6 +70,106 @@ public final class MegaEvolution {
 
     private record Original(Set<String> forcedAspects, MutableComponent nickname, Ability ability) {}
 
+    private static final String SAVED_MEGA_STATE = "megacobble:original";
+
+    /** Save before changing the Pokemon: logout can serialize its party before battle cleanup. */
+    private static Original rememberOriginal(Pokemon pokemon, String mode) {
+        Original existing = readOriginal(pokemon, mode);
+        if (existing != null) return existing;
+        Original original = new Original(new HashSet<>(pokemon.getForcedAspects()),
+            pokemon.getNickname(), pokemon.getAbility());
+        CompoundTag saved = new CompoundTag();
+        saved.putString("mode", mode);
+        ListTag aspects = new ListTag();
+        original.forcedAspects().forEach(aspect -> aspects.add(StringTag.valueOf(aspect)));
+        saved.put("aspects", aspects);
+        saved.put("ability", Ability.getCODEC().encodeStart(NbtOps.INSTANCE, original.ability()).getOrThrow());
+        if (original.nickname() != null) {
+            saved.putString("nickname", Component.Serializer.toJson(original.nickname(),
+                Cobblemon.INSTANCE.getImplementation().server().registryAccess()));
+        }
+        pokemon.getPersistentData().put(SAVED_MEGA_STATE, saved);
+        return original;
+    }
+
+    private static Original readOriginal(Pokemon pokemon, String mode) {
+        CompoundTag saved = pokemon.getPersistentData().getCompound(SAVED_MEGA_STATE);
+        if (!mode.equals(saved.getString("mode"))) return null;
+        Set<String> aspects = new HashSet<>();
+        for (Tag aspect : saved.getList("aspects", Tag.TAG_STRING)) aspects.add(aspect.getAsString());
+        Ability ability = Ability.getCODEC().parse(NbtOps.INSTANCE, saved.get("ability")).getOrThrow();
+        MutableComponent nickname = saved.contains("nickname", Tag.TAG_STRING)
+            ? Component.Serializer.fromJson(saved.getString("nickname"),
+                Cobblemon.INSTANCE.getImplementation().server().registryAccess()) : null;
+        return new Original(aspects, nickname, ability);
+    }
+
+    private static void restoreOriginal(Pokemon pokemon, Original original) {
+        pokemon.setForcedAspects(original.forcedAspects());
+        pokemon.setAbility$common(original.ability());
+        pokemon.setNickname(original.nickname());
+        pokemon.getPersistentData().remove(SAVED_MEGA_STATE);
+    }
+
+    /** Restores saved temporary forms after a reload, before send-out or a new battle. */
+    public static void recoverOrphanedMega(Pokemon pokemon) {
+        if (MEGA_STATES.containsKey(pokemon.getUuid()) || WORLD_MEGA_STATES.containsKey(pokemon.getUuid())) return;
+        if (pokemon.getPersistentData().contains(SAVED_MEGA_STATE, Tag.TAG_COMPOUND)) {
+            Original original = readOriginal(pokemon, "battle");
+            if (original == null) original = readOriginal(pokemon, "world");
+            if (original != null) {
+                restoreOriginal(pokemon, original);
+                MegaCobble.LOGGER.info("[Mega Cobble] Recovered saved Mega state for {}.", pokemon.getUuid());
+            }
+            return;
+        }
+        // Older versions saved no original state. Only migrate our forced Mega + generated name,
+        // leaving intentionally configured forms/custom nicknames belonging to other mods alone.
+        FormData form = pokemon.getForm();
+        String generated = buildMegaName(pokemon.getSpecies().getName(), form.getName());
+        String nickname = pokemon.getNickname() == null ? "" : pokemon.getNickname().getString();
+        if (!form.getName().toLowerCase(Locale.ROOT).startsWith("mega")
+            || !(nickname.equals(generated) || nickname.equals(generated.substring(0, Math.min(12, generated.length()))))) {
+            return;
+        }
+        Set<String> aspects = new HashSet<>(pokemon.getForcedAspects());
+        if (!aspects.removeIf(aspect -> aspect.equals("mega") || aspect.startsWith("mega-"))) return;
+        Ability oldAbility = pokemon.getAbility();
+        pokemon.setForcedAspects(aspects);
+        // Some old saves still have their base ability. Keep it if it belongs to the restored form.
+        for (PotentialAbility potential : pokemon.getForm().getAbilities()) {
+            if (potential.getTemplate() != null && potential.getTemplate().equals(oldAbility.getTemplate())) {
+                pokemon.setAbility$common(oldAbility);
+                break;
+            }
+        }
+        // Forced Mega-only abilities bypass automatic form updates, so choose a valid base slot.
+        boolean valid = false;
+        for (PotentialAbility potential : pokemon.getForm().getAbilities()) {
+            if (pokemon.getAbility().getTemplate().equals(potential.getTemplate())) valid = true;
+        }
+        if (!valid) pokemon.rollAbility();
+        pokemon.setNickname(null);
+        MegaCobble.LOGGER.info("[Mega Cobble] Recovered legacy Mega state for {}; original nickname/slot was not saved.",
+            pokemon.getUuid());
+    }
+
+    /** Reconnects start outside the old battle, including reconnects in the same server process. */
+    public static void recoverPlayerMegas(ServerPlayer player) {
+        for (Pokemon pokemon : Cobblemon.INSTANCE.getStorage().getParty(player)) {
+            revert(pokemon);
+            revertWorldMega(pokemon);
+            recoverOrphanedMega(pokemon);
+        }
+    }
+
+    /** Never carry object references across integrated-server worlds. Durable snapshots survive. */
+    public static void clearSessionState() {
+        MEGA_STATES.clear();
+        WORLD_MEGA_STATES.clear();
+        BATTLE_MEGAS.clear();
+    }
+
     private record BattleMega(Pokemon pokemon, PokemonBattle battle) {}
 
     /** Outcome of a world (out-of-battle) Mega Evolution request, for command / packet feedback. */
@@ -98,6 +203,7 @@ public final class MegaEvolution {
      * {@link #revert}.
      */
     public static void applyMega(Pokemon target, PokemonBattle battle) {
+        recoverOrphanedMega(target);
         MegaStones.MegaStone stone = MegaStones.byCustomData(target.heldItem());
         // Stoneless megas (Rayquaza via Dragon Ascent) hold no Mega Stone, so resolve their form from
         // the species' first mega form instead — otherwise the Showdown-driven mega would apply the
@@ -108,8 +214,7 @@ public final class MegaEvolution {
         if (megaForm == null) {
             return;
         }
-        MEGA_STATES.putIfAbsent(target.getUuid(),
-            new Original(new HashSet<>(target.getForcedAspects()), target.getNickname(), target.getAbility()));
+        MEGA_STATES.computeIfAbsent(target.getUuid(), uuid -> rememberOriginal(target, "battle"));
         BATTLE_MEGAS.put(target.getUuid(), new BattleMega(target, battle));
 
         Set<String> forced = new HashSet<>(target.getForcedAspects());
@@ -183,13 +288,11 @@ public final class MegaEvolution {
     public static void revert(Pokemon pokemon) {
         BattleMega battleMega = BATTLE_MEGAS.remove(pokemon.getUuid());
         Original original = MEGA_STATES.remove(pokemon.getUuid());
+        if (original == null) original = readOriginal(pokemon, "battle");
         if (original == null) {
             return;
         }
-        pokemon.setForcedAspects(original.forcedAspects());
-        // Preserve the exact base slot, including hidden and command-forced abilities.
-        pokemon.setAbility$common(original.ability());
-        pokemon.setNickname(original.nickname());
+        restoreOriginal(pokemon, original);
         if (battleMega != null && !battleMega.battle().getEnded()) {
             refreshBattleTeam(pokemon, battleMega.battle());
         }
@@ -252,6 +355,7 @@ public final class MegaEvolution {
      * side — Cobblemon syncs it to the client and persists it — without touching the battle sim.
      */
     public static WorldMegaResult applyWorldMega(ServerPlayer player, Pokemon target) {
+        recoverOrphanedMega(target);
         MegaCobbleConfig cfg = MegaCobbleConfig.get();
         if (!cfg.worldMegaEnabled) {
             return WorldMegaResult.DISABLED;
@@ -285,8 +389,7 @@ public final class MegaEvolution {
         }
         inheritRidingFromSpecies(megaForm);
 
-        WORLD_MEGA_STATES.put(target.getUuid(),
-            new Original(new HashSet<>(target.getForcedAspects()), target.getNickname(), target.getAbility()));
+        WORLD_MEGA_STATES.put(target.getUuid(), rememberOriginal(target, "world"));
 
         Set<String> forced = new HashSet<>(target.getForcedAspects());
         forced.addAll(megaForm.getAspects());
@@ -303,12 +406,11 @@ public final class MegaEvolution {
     /** Reverts a world-mega'd Pokémon to its pre-mega state. @return true if it was world-mega'd. */
     public static boolean revertWorldMega(Pokemon pokemon) {
         Original original = WORLD_MEGA_STATES.remove(pokemon.getUuid());
+        if (original == null) original = readOriginal(pokemon, "world");
         if (original == null) {
             return false;
         }
-        pokemon.setForcedAspects(original.forcedAspects());
-        pokemon.setAbility$common(original.ability());
-        pokemon.setNickname(original.nickname());
+        restoreOriginal(pokemon, original);
         MegaCobble.LOGGER.info("[Mega Cobble] Reverted world mega {} ({}).",
             pokemon.getSpecies().getName(), pokemon.getUuid());
         return true;

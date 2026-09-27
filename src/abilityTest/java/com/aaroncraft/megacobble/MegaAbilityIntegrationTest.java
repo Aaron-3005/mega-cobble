@@ -20,6 +20,8 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
@@ -42,9 +44,16 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
                     checkLifecycle("garchomp ability=sandveil", "garchompite_z", "levitate", forced);
                     checkLifecycle("garchomp ability=roughskin", "garchompite_z", "levitate", forced);
                     checkLifecycle("garchomp ability=roughskin", "garchompite", "sandforce", forced);
+                    for (boolean world : List.of(false, true)) {
+                        checkReload("garchomp ability=sandveil", forced, world);
+                        checkReload("garchomp ability=roughskin", forced, world);
+                    }
                 }
-                Files.writeString(Path.of("ability-tests-passed.txt"), "6 battle + 6 world ability lifecycles passed\n");
-                MegaCobble.LOGGER.info("[Mega ability tests] PASS: 6 battle + 6 world ability lifecycles");
+                for (String ability : List.of("sandveil", "levitate")) {
+                    for (boolean forced : List.of(false, true)) checkLegacyRecovery(ability, forced);
+                }
+                Files.writeString(Path.of("ability-tests-passed.txt"), "12 ability lifecycles + 8 reloads + 4 legacy recoveries passed\n");
+                MegaCobble.LOGGER.info("[Mega ability tests] PASS: 12 ability lifecycles + 8 reloads + 4 legacy recoveries");
             } catch (Exception | AssertionError failure) {
                 MegaCobble.LOGGER.error("[Mega ability tests] FAIL", failure);
             } finally {
@@ -97,6 +106,62 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
 
     private static void check(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
+    }
+
+    private static void checkReload(String properties, boolean forced, boolean world) {
+        Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
+        pokemon.getAbility().setForced$common(forced);
+        Ability original = pokemon.getAbility();
+        var originalForm = pokemon.getForm().getName();
+        pokemon.setForcedAspects(java.util.Set.of("test-skin"));
+        MutableComponent nickname = Component.literal("Partner").withStyle(ChatFormatting.GOLD);
+        pokemon.setNickname(nickname);
+        pokemon.swapHeldItem(MegaItems.createStone(MegaStones.byStoneId("garchompite_z")), false, false);
+        boolean requiredKey = MegaCobbleConfig.get().requireKeyStone;
+        MegaCobbleConfig.get().requireKeyStone = false;
+        try {
+            if (world) {
+                MegaEvolution.applyWorldMega(null, pokemon);
+            } else {
+                MegaEvolution.applyMega(pokemon, new PokemonBattle(BattleFormat.Companion.getGEN_9_SINGLES(),
+                    new BattleSide(new RecordingActor(pokemon)), new BattleSide()));
+            }
+            MegaEvolution.recoverOrphanedMega(pokemon);
+            check(pokemon.getForm().getName().equals("Mega-Z"), "Recovery reverted a live Mega");
+            // Reproduce logout/save before cleanup, followed by a fresh JVM with no in-memory state.
+            CompoundTag saved = pokemon.saveToNBT(registries, new CompoundTag());
+            MegaEvolution.clearSessionState();
+            Pokemon reloaded = new Pokemon().loadFromNBT(registries, saved);
+            MegaEvolution.recoverOrphanedMega(reloaded);
+            check(reloaded.getForm().getName().equals(originalForm), "Reload retained the Mega form");
+            check(reloaded.getForcedAspects().equals(java.util.Set.of("test-skin")), "Reload lost a skin aspect");
+            check(nickname.equals(reloaded.getNickname()), "Reload lost the original styled nickname");
+            check(reloaded.getAbility().getName().equals(original.getName()), "Reload lost the original ability");
+            check(reloaded.getAbility().getForced() == forced, "Reload changed forced ability status");
+            check(reloaded.getAbility().getPriority() == original.getPriority()
+                && reloaded.getAbility().getIndex() == original.getIndex(), "Reload lost the hidden ability slot");
+            check(!reloaded.getPersistentData().contains("megacobble:original"), "Recovery left its marker behind");
+        } finally {
+            MegaCobbleConfig.get().requireKeyStone = requiredKey;
+            MegaEvolution.clearSessionState();
+        }
+    }
+
+    private static void checkLegacyRecovery(String ability, boolean forced) {
+        Pokemon pokemon = PokemonProperties.Companion.parse("garchomp ability=" + ability).create();
+        pokemon.getAbility().setForced$common(forced);
+        Ability original = pokemon.getAbility();
+        pokemon.setForcedAspects(java.util.Set.of("mega-z", "test-skin"));
+        pokemon.setAbility$common(original);
+        pokemon.setNickname(Component.literal("Mega-Garchom"));
+        MegaEvolution.recoverOrphanedMega(pokemon);
+        check(!pokemon.getForm().getName().startsWith("Mega"), "Legacy save stayed Mega");
+        check(List.of("sandveil", "roughskin").contains(pokemon.getAbility().getName()), "Legacy ability stayed Mega-only");
+        if (ability.equals("sandveil")) {
+            check(pokemon.getAbility() == original, "Legacy base ability was discarded");
+        }
+        check(pokemon.getNickname() == null, "Legacy generated nickname stayed Mega");
+        check(pokemon.getForcedAspects().equals(java.util.Set.of("test-skin")), "Legacy recovery lost a skin");
     }
 
     private static final class RecordingActor extends BattleActor {

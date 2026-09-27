@@ -97,8 +97,13 @@ this flattening to catch transport-specific syntax failures.
 The Minecraft bridge explicitly applies the Mega form's ability and refreshes Cobblemon's separate
 battle-team snapshot. This fixes the summary showing the base ability (for example Sand Veil on
 Mega Garchomp Z). Both battle and world Mega reversion preserve the original ability and slot.
-With Java 21, `.\gradlew.bat -PmegaAbilityTests runAbilityTestServer` runs 12 lifecycle checks in an
-isolated headless server, including packet encode/decode and normal, hidden and forced abilities.
+The original state also saves in Pokémon persistent data, since party storage can save/unload before
+battle cleanup during logout. Login, send-out and battle entry recover interrupted transformations.
+Legacy saves with the mod's generated name and forced Mega aspect are repaired, although an original
+nickname or ability slot absent from those old saves cannot be reconstructed exactly.
+With Java 21, `.\gradlew.bat -PmegaAbilityTests runAbilityTestServer` runs 24 checks in an
+isolated headless server: 12 lifecycles, 8 save/reloads and 4 legacy repairs, including packet
+encode/decode and normal, hidden and forced abilities.
 It shuts down automatically; its test mod is excluded from the release JAR and ordinary client runs.
 
 ```powershell

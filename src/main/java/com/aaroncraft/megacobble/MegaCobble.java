@@ -22,6 +22,8 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.chat.Component;
@@ -82,6 +84,12 @@ public class MegaCobble implements ModInitializer {
 		// button is only enabled when they brought a Key Stone, and revert any out-of-battle ("world")
 		// megas so the real in-battle Showdown mega applies to the base form.
 		CobblemonEvents.BATTLE_STARTED_PRE.subscribe(event -> {
+			for (var actor : event.getBattle().getActors()) {
+				for (var member : actor.getPokemonList()) {
+					MegaEvolution.recoverOrphanedMega(member.getOriginalPokemon());
+					MegaEvolution.recoverOrphanedMega(member.getEffectedPokemon());
+				}
+			}
 			MegaShowdownInjector.injectAll();
 			MegaShowdownInjector.fixMegaAbilities();
 			event.getBattle().getPlayers().forEach(MegaEvolution::syncKeyStone);
@@ -100,6 +108,13 @@ public class MegaCobble implements ModInitializer {
 		CobblemonEvents.BATTLE_VICTORY.subscribe(event -> MegaEvolution.revertBattle(event.getBattle()));
 		CobblemonEvents.BATTLE_FLED.subscribe(event -> MegaEvolution.revertBattle(event.getBattle()));
 		CobblemonEvents.BATTLE_FAINTED.subscribe(event -> MegaEvolution.revert(event.getKilled().getEffectedPokemon()));
+
+		// Party storage may be saved/unloaded before end-of-tick battle cleanup on disconnect.
+		// Recover from the Pokemon's durable snapshot on login and when a boxed Pokemon is sent out.
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+			MegaEvolution.recoverPlayerMegas(handler.player));
+		CobblemonEvents.POKEMON_SENT_PRE.subscribe(event -> MegaEvolution.recoverOrphanedMega(event.getPokemon()));
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> MegaEvolution.clearSessionState());
 
 		// Safety net: BATTLE_VICTORY/FLED only fire on a win or flee. Battles that end any other way
 		// (custom, forced, drawn) post no event, so reconcile every tick — revert any in-battle mega

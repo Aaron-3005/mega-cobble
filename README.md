@@ -354,6 +354,11 @@ and kept only as a local reference.
 Newest first.
 
 - **Unreleased — 2026-09-27: Mega ability corrections and roster audit.**
+  - Fixed Mega forms surviving logout/restart: the original aspects, nickname and ability now save
+    with the Pokémon and recover on login/send-out or before a new battle. Older stuck saves with
+    the mod's generated Mega nickname and forced Mega aspect are also repaired. Those old saves
+    did not retain the original nickname/ability slot, so recovery preserves a valid base ability
+    where available, otherwise selects one from the base form.
   - Fixed the battle summary retaining the base ability after Mega Evolution (for example, Sand
     Veil instead of Levitate on Mega Garchomp Z). Refresh the battle team snapshot and explicitly
     apply the Mega ability, including when the base ability was command-forced. Battle and world
@@ -369,8 +374,9 @@ Newest first.
   - Audited all **45 custom and 48 classic Mega forms** against current references. Six custom
     assignments remain provisional. Editable ability sources now live in `tools/abilities/` and
     generate both the Cobblemon registrations and Showdown definitions.
-  - **Validation:** 27 simulator regression tests and 12 Minecraft ability lifecycle checks pass,
-    including battle-summary packet serialization, hidden/forced base abilities and reversion.
+  - **Validation:** 27 simulator regression tests and 24 Minecraft checks pass: 12 ability
+    lifecycles, 8 save/reload recoveries and 4 legacy-save recoveries. Coverage includes battle-summary
+    packet serialization, hidden/forced base abilities, styled nicknames and unrelated skin aspects.
     Java 21 build passes; visual UI retesting and coverage of every species remain pending.
     See [the full audit](docs/mega-abilities-audit.md) for sources and remaining uncertainties.
 
