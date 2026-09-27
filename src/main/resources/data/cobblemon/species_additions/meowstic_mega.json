@@ -19,7 +19,8 @@
         "mega"
       ],
       "battleOnly": true,
-      "requiredItem": "Meowsticite"
+      "requiredItem": "Meowsticite",
+      "maleRatio": 0.5
     }
   ]
 }

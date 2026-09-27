@@ -134,6 +134,7 @@ for sp, entries in by_species.items():
                   "abilities":[ab_id],"aspects":[e['aspect']],"battleOnly":True,
                   "requiredItem":stone_name_for(sp, e['form'])}
         if e.get('type2'): form_obj["secondaryType"]=e['type2']
+        if 'maleRatio' in e: form_obj['maleRatio']=e['maleRatio']
         forms.append(form_obj)
     json.dump({"target":f"cobblemon:{sp}","forms":forms},
               open(f"{sa_dir}/{sp}_mega.json","w"),indent=2)

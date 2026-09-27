@@ -345,7 +345,8 @@
     "special_attack": 143,
     "special_defence": 101,
     "speed": 124
-   }
+   },
+   "maleRatio": 0.5
   },
   {
    "species": "malamar",

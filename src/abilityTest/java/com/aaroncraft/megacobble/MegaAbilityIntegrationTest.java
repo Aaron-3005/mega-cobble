@@ -122,6 +122,11 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
         Pokemon rayquaza = PokemonProperties.Companion.parse("rayquaza moves=dragonascent").create();
         check(MegaEvolution.knowsStonelessMegaMove(rayquaza), "Rayquaza test did not learn Dragon Ascent");
         checkRosterForm(rayquaza, "Mega");
+        for (String gender : List.of("male", "female")) {
+            Pokemon meowstic = PokemonProperties.Companion.parse("meowstic gender=" + gender).create();
+            meowstic.swapHeldItem(MegaItems.createStone(MegaStones.byStoneId("meowsticite")), false, false);
+            checkRosterForm(meowstic, "Mega");
+        }
     }
 
     private static void checkRosterForm(Pokemon pokemon, String formName) {
@@ -131,6 +136,7 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
             check(mega != null, "Missing form");
             String expectedAbility = mega.getAbilities().iterator().next().getTemplate().getName();
             FormData base = pokemon.getForm();
+            var originalGender = pokemon.getGender();
             Ability original = pokemon.getAbility();
             var aspects = new java.util.HashSet<>(pokemon.getForcedAspects());
             pokemon.setNickname(Component.literal("Partner"));
@@ -141,11 +147,13 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
                 new BattleSide(owner), new BattleSide());
             MegaEvolution.applyMega(pokemon, battle);
             check(pokemon.getForm() == mega, "Wrong Mega form selected");
+            check(pokemon.getGender() == originalGender, "Battle Mega changed gender");
             check(pokemon.getAbility().getName().equals(expectedAbility), "Wrong Mega ability");
             check(owner.abilities.equals(List.of(expectedAbility)), "Battle summary did not receive Mega ability");
             CompoundTag battleSave = pokemon.saveToNBT(registries, new CompoundTag());
             MegaEvolution.revert(pokemon);
             checkRestored(pokemon, base, original, aspects);
+            check(pokemon.getGender() == originalGender, "Reversion changed gender");
             checkReloadedRoster(battleSave, base, original, aspects);
 
             boolean keyRequired = MegaCobbleConfig.get().requireKeyStone;
@@ -155,6 +163,7 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
                     "World Mega rejected correct species/form/item");
                 check(pokemon.getForm() == mega && pokemon.getAbility().getName().equals(expectedAbility),
                     "World Mega disagrees with battle Mega");
+                check(pokemon.getGender() == originalGender, "World Mega changed gender");
                 CompoundTag worldSave = pokemon.saveToNBT(registries, new CompoundTag());
                 MegaEvolution.revertWorldMega(pokemon);
                 checkRestored(pokemon, base, original, aspects);
@@ -168,7 +177,7 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
     }
 
     private static void checkRestored(Pokemon pokemon, FormData base, Ability ability, java.util.Set<String> aspects) {
-        check(pokemon.getForm() == base, "Reversion lost the base form");
+        check(pokemon.getForm() == base, "Reversion lost the base form: " + base.getName() + " -> " + pokemon.getForm().getName());
         check(pokemon.getAbility().getName().equals(ability.getName())
             && pokemon.getAbility().getForced() == ability.getForced()
             && pokemon.getAbility().getPriority() == ability.getPriority()
