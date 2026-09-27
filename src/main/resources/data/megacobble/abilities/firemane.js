@@ -1,1 +1,11 @@
-{ name: 'Fire Mane', onBasePowerPriority: 19, onBasePower(basePower, attacker, defender, move) { if (move.type === 'Fire') { return this.chainModify(1.5); } } }
+{
+  name: 'Fire Mane',
+  onModifyAtkPriority: 5,
+  onModifyAtk(attack, attacker, defender, move) {
+    if (move.type === 'Fire') return this.chainModify(1.5);
+  },
+  onModifySpAPriority: 5,
+  onModifySpA(attack, attacker, defender, move) {
+    if (move.type === 'Fire') return this.chainModify(1.5);
+  }
+}

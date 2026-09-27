@@ -8,9 +8,10 @@ Generates the Legends Z-A / custom megas through the proven custom-mega pipeline
 Stones are vanilla items identified by custom_data, so no item textures/models are generated.
 Run AFTER gen_megastones.py (which produces the classic 47). Reads za_megas.json for stats/types/abilities.
 """
-import os, json, shutil
+import os, json
+from pathlib import Path
 
-ROOT = r"E:/mod dev/mega co/src/main/resources"
+ROOT = str(Path(__file__).resolve().parents[1] / "src/main/resources")
 
 # Species we ship a mega for (complete data in za_megas.json) -> canonical Mega Stone name.
 # A species with multiple mega formes maps to a {form-name: stone-name} dict (e.g. Raichu X/Y).
@@ -26,7 +27,7 @@ STONE_NAMES = {
  'pyroar':'Pyroarite','scolipede':'Scolipite','scovillain':'Scovillite','scrafty':'Scraftite',
  'staraptor':'Staraptite',
  'raichu':{'Mega-X':'Raichunite X','Mega-Y':'Raichunite Y'},
- # DLC legendaries: shipped with their base ability as a placeholder until Champions assigns one.
+ # DLC megas; see docs/mega-abilities-audit.md for confirmed and provisional abilities.
  # Garchomp/Lucario/Absol get a NEW "Z" mega distinct from their classic ORAS mega.
  'darkrai':'Darkraite','garchomp':'Garchompite Z','lucario':'Lucarionite Z','heatran':'Heatranite',
  'magearna':'Magearnite','zeraora':'Zeraorite','baxcalibur':'Baxcalibite','golisopod':'Golisopite',
@@ -46,54 +47,34 @@ REQUIRED_ASPECT = {
 # substitute resolver variation. (Eternal Floette has no model -> not listed -> gets a placeholder.)
 REQ_BASE_HAS_MODEL = {'zygarde'}
 
-# za_megas ability value -> Showdown ability id, for the brand-new abilities.
-NEW_ABILITY_ID = {'mega_sol':'megasol','dragonize':'dragonize','piercing_drill':'piercingdrill',
- 'spicy_spray':'spicyspray','fire_mane':'firemane'}
-
-# Display name + description (shown in the summary screen via cobblemon.ability.<id> lang keys).
+# Editable ability sources; the same generated object is registered on both sides.
+ABILITY_DIR = Path(__file__).resolve().parent / 'abilities'
+NEW_ABILITY_ID = {'mega_sol':'megasol', 'piercing_drill':'piercingdrill',
+                  'spicy_spray':'spicyspray', 'fire_mane':'firemane', 'aura_guard':'auraguard'}
 NEW_ABILITY_DESC = {
- 'dragonize': "This Pokemon's Normal-type moves become Dragon-type and gain a small power boost.",
- 'piercingdrill': "This Pokemon's contact moves strike through Protect and Detect.",
- 'megasol': "This Pokemon's moves act as if harsh sunlight is active: Fire-type power x1.5, Water-type power x0.5, and Solar Beam/Solar Blade fire in one turn with no weather penalty.",
+ 'dragonize': "This Pokemon's eligible Normal-type moves become Dragon-type and gain 20% power.",
+ 'piercingdrill': "This Pokemon's contact moves hit through protection for one quarter of normal damage.",
+ 'megasol': "This Pokemon uses its moves as if harsh sunlight were active, without changing the weather.",
  'spicyspray': "When this Pokemon is hit by a damaging move, the attacker is burned.",
- 'firemane': "This Pokemon's Fire-type moves have 1.5x power.",
- 'eelevate': "This Pokemon is immune to Ground-type moves, and KOing a Pokemon raises its highest stat by 1.",
+ 'firemane': "This Pokemon's Fire-type attacks are powered up by 50%.",
+ 'eelevate': "This Pokemon floats above the ground. Knocking out a Pokemon with an attack raises its highest stat by 1.",
+ 'auraguard': "Halves the damage this Pokemon takes from contact moves.",
 }
+ABILITY_NAMES = {'dragonize':'Dragonize', 'piercingdrill':'Piercing Drill', 'megasol':'Mega Sol',
+                 'spicyspray':'Spicy Spray', 'firemane':'Fire Mane', 'eelevate':'Eelevate', 'auraguard':'Aura Guard'}
+compatibility = (ABILITY_DIR / 'compatibility.js').read_text(encoding='utf-8').strip()
 
-# Minimal, original implementations of the new abilities (the sim eval()s these).
+def ability_source(ability):
+    source = (ABILITY_DIR / (ability + '.js')).read_text(encoding='utf-8')
+    source = source.replace('__INSTALL_COMPAT__', compatibility)
+    # GraalShowdownService.sendRegistryData removes newlines before eval. Our
+    # source comments occupy whole lines; omit them so they cannot swallow code.
+    return '\n'.join(line for line in source.splitlines()
+                     if not line.lstrip().startswith('//')).strip()
+
 NEW_ABILITY_JS = {
- 'dragonize': ("Dragonize",
-   "{ name: 'Dragonize', onModifyTypePriority: -1,"
-   " onModifyType(move, pokemon) { if (move.type === 'Normal' && move.id !== 'weatherball' && !(move.isZ && move.category !== 'Status')) { move.type = 'Dragon'; move.typeChangerBoosted = this.effect; } },"
-   " onBasePowerPriority: 23,"
-   " onBasePower(bp, pokemon, target, move) { if (move.typeChangerBoosted === this.effect) return this.chainModify([4915, 4096]); } }"),
- 'piercingdrill': ("Piercing Drill",
-   "{ name: 'Piercing Drill', onModifyMove(move) { if (move.flags['contact']) { move.flags['protect'] = 0; } } }"),
- # Mega Sol: this Pokemon's moves behave as if harsh sunlight (Sunny Day) is up, without setting
- # weather. Fire x1.5 / Water x0.5 base power; Solar Beam/Solar Blade fire in one turn (no charge,
- # like Power Herb) and skip the rain/sand/snow power penalty.
- 'megasol': ("Mega Sol",
-   "{ name: 'Mega Sol',"
-   " onChargeMove(pokemon, target, move) { if (move.id === 'solarbeam' || move.id === 'solarblade') { this.attrLastMove('[still]'); this.addMove('-anim', pokemon, move.name, target); return false; } },"
-   " onBasePowerPriority: 21,"
-   " onBasePower(basePower, attacker, defender, move) { if (move.type === 'Fire') { return this.chainModify(1.5); } if (move.type === 'Water') { return this.chainModify(0.5); } if ((move.id === 'solarbeam' || move.id === 'solarblade') && ['raindance', 'primordialsea', 'sandstorm', 'hail', 'snow'].includes(attacker.effectiveWeather())) { return this.chainModify(2); } } }"),
- # Spicy Spray (Mega Scovillain): burn the attacker whenever this Pokemon is hit by a damaging move.
- 'spicyspray': ("Spicy Spray",
-   "{ name: 'Spicy Spray', onDamagingHit(damage, target, source, move) { source.trySetStatus('brn', target); } }"),
- # Fire Mane (Mega Pyroar): this Pokemon's Fire-type moves deal 1.5x damage.
- 'firemane': ("Fire Mane",
-   "{ name: 'Fire Mane', onBasePowerPriority: 19,"
-   " onBasePower(basePower, attacker, defender, move) { if (move.type === 'Fire') { return this.chainModify(1.5); } } }"),
- # Eelevate (Mega Eelektross): Levitate-style Ground-move immunity + Beast Boost (raise highest stat
- # by 1 on a KO). NOTE: the sim's isGrounded() is hardcoded to the literal 'levitate' id and Cobblemon's
- # injection API can't override it, so the broader "ungrounded" immunities (entry hazards, Arena Trap,
- # terrain) can't be granted without patching the sim. We do the Ground-MOVE immunity faithfully via
- # onTryHit: breakable (Mold Breaker bypasses it) and skipped for moves that ignore Ground immunity
- # (e.g. Thousand Arrows).
- 'eelevate': ("Eelevate",
-   "{ name: 'Eelevate', flags: { breakable: 1 },"
-   " onTryHit(target, source, move) { if (target !== source && move.type === 'Ground' && !(move.ignoreImmunity === true || (move.ignoreImmunity && move.ignoreImmunity['Ground']))) { this.add('-immune', target, '[from] ability: Eelevate'); return null; } },"
-   " onSourceAfterFaint(length, target, source, effect) { if (effect && effect.effectType === 'Move') { const bestStat = source.getBestStat(true, true); this.boost({ [bestStat]: length }, source); } } }"),
+    ability: (name, ability_source(ability))
+    for ability, name in ABILITY_NAMES.items()
 }
 
 ZA = json.load(open(os.path.join(ROOT,'za_megas.json'),encoding='utf-8'))['megas']
@@ -103,9 +84,8 @@ lang_path = os.path.join(ROOT,'assets/megacobble/lang/en_us.json')
 manifest = json.load(open(manifest_path,encoding='utf-8'))
 lang = json.load(open(lang_path,encoding='utf-8'))
 
-# clean our generated species_additions so reruns don't duplicate
+# One generated file per species; overwrite it in place on regeneration.
 sa_dir = os.path.join(ROOT,'data/cobblemon/species_additions')
-if os.path.isdir(sa_dir): shutil.rmtree(sa_dir)
 os.makedirs(sa_dir,exist_ok=True)
 
 def sub(asp, shiny=False):
@@ -196,7 +176,6 @@ json.dump(lang, open(lang_path,"w",encoding='utf-8'),indent=2,ensure_ascii=False
 # New abilities ship as Cobblemon datapack ability files: this registers them on the Cobblemon side,
 # which is REQUIRED for species_additions referencing them to parse (and for our form-data lookup).
 ab_dir = os.path.join(ROOT,'data/megacobble/abilities')
-if os.path.isdir(ab_dir): shutil.rmtree(ab_dir)
 os.makedirs(ab_dir,exist_ok=True)
 for ab_id, js in abilities.items():
     open(f"{ab_dir}/{ab_id}.js","w").write(js + "\n")

@@ -219,8 +219,9 @@ data files and running the generators — no code changes.
 
 3. **(Only if the ability is brand-new)** In `tools/gen_custom_megas.py` add it to:
    - `NEW_ABILITY_ID` — map the `za_megas.json` ability value to its Showdown id,
-   - `NEW_ABILITY_JS` — the `(display name, JS effect)` (the sim `eval`s the JS object;
-     use Showdown's ability API: `onModifyType`, `onBasePower`, `onDamagingHit`, …),
+   - `ABILITY_NAMES` — the display name; put its JS object in `tools/abilities/<id>.js`
+     (the sim `eval`s the generated object; use Showdown hooks such as `onModifyType`,
+     `onBasePower`, and `onDamagingHit`),
    - `NEW_ABILITY_DESC` — the summary-screen description.
 
 4. **Generate.** Run both generators (classic first, then the custom batch which appends):
@@ -329,27 +330,42 @@ and kept only as a local reference.
 - **All megas render the substitute doll** for now — no real per-mega models ship yet. The custom Mega
   Venusaur model/animation was moved out to `../megacobble-assets/` (not shipped) while the visual
   delivery is reworked toward a command-driven, resource-pack-based pipeline. This is the biggest gap.
-- **The 10 DLC legendaries** (Darkrai, Garchomp-Z, Lucario-Z, Heatran, Magearna, Zeraora, Baxcalibur,
-  Golisopod, Tatsugiri, Absol-Z) temporarily use their **base-form ability** as a placeholder — Pokémon
-  Champions hasn't assigned them a mega ability yet. Update the `ability` field in `za_megas.json` and
-  re-run `gen_custom_megas.py` when the real ones are revealed (flagged there in `_pending_comment`).
-- **Eelevate** (Mega Eelektross) grants Ground-*move* immunity + Beast-Boost-on-KO only. The broader
-  "ungrounded" immunities (entry hazards, Arena Trap, terrain) key off the sim's internal
-  `isGrounded()`, which is hardcoded to the literal Levitate ability and can't be extended through
-  Cobblemon's data-injection API.
-- **Mega Sol** covers the Fire ×1.5 / Water ×0.5 damage modifier and the Solar Beam/Blade single-turn
-  behaviour; the remaining harsh-sun niceties (Growth +2, Synthesis/Moonlight ⅔ healing, Weather Ball →
-  Fire, thaw) aren't implemented.
+- **Six Mega abilities remain provisional:** Darkrai, Heatran, Magearna, Zeraora, Tatsugiri and
+  Zygarde keep their base primary ability pending confirmed Champions assignments. The September
+  2026 audit updated Garchomp Z to Levitate, Lucario Z to Aura Guard, Golisopod to Tough Claws and
+  Absol Z to Sharpness; Baxcalibur's Thermal Exchange remains correct.
+- **New ability compatibility** is tested against Cobblemon 1.7.3's bundled simulator. Mega Sol and
+  Eelevate now use battle-local weather/grounding adapters, and Piercing Drill deals quarter damage
+  through protection. Details, sources and remaining uncertainties are in
+  **[the ability audit](docs/mega-abilities-audit.md)**. Re-run `python tools/test_mega_abilities.py`
+  after ability changes or simulator upgrades.
 - **The original 19 Z-A megas' stats/types are unverified** — only their abilities were confirmed. The
   newer 25 use Serebii-verified numbers, so a stat/type pass on the original 19 would make the data set
   consistent.
-- **Most megas aren't battle-tested yet** — the multi-form (Raichu X/Y) and "Z" formes, and the new
-  abilities beyond Mega Sol/Eelevate, load cleanly but haven't all been exercised in an actual battle.
+- **In-game coverage is incomplete.** Automated simulator tests cover all seven custom abilities
+  and ten Mega transformations, including the Z forms. This does not replace Minecraft-side testing
+  of every species, multi-form variant, or interaction with other mods.
 - **Mega Floette** applies only to AZ's Eternal-Flower Floette (`flower-eternal`) via `requiredAspect`.
 
 ## Changelog
 
 Newest first.
+
+- **Unreleased — 2026-09-27: Mega ability corrections and roster audit.**
+  - Piercing Drill now deals **one quarter damage through protection**, per target, while keeping
+    contact effects; noncontact moves and Max Guard retain their normal protection behavior.
+  - Mega Sol now handles move-specific sunlight effects, weather damage without double stacking,
+    and weather-based defense/evasion. Eelevate now grants airborne hazard, terrain and Arena Trap
+    immunity while respecting grounding effects, Mold Breaker and ability suppression.
+  - Corrected Dragonize's type-conversion exclusions and Fire Mane's damage calculation stage.
+    Added **Aura Guard** for Mega Lucario Z; changed Mega Garchomp Z to **Levitate**, Mega Golisopod
+    to **Tough Claws**, and Mega Absol Z to **Sharpness**.
+  - Audited all **45 custom and 48 classic Mega forms** against current references. Six custom
+    assignments remain provisional. Editable ability sources now live in `tools/abilities/` and
+    generate both the Cobblemon registrations and Showdown definitions.
+  - **Validation:** 27 simulator regression tests pass, including ten Mega transformations;
+    Java 21 build passes. Minecraft-side testing remains pending.
+    See [the full audit](docs/mega-abilities-audit.md) for sources and remaining uncertainties.
 
 - **v0.1.2 — stoneless Mega Rayquaza (in-battle + overworld).** Rayquaza Mega Evolves with **no Mega
   Stone**, the authentic way: it just needs to know **Dragon Ascent** (+ a Key Stone). In battle the

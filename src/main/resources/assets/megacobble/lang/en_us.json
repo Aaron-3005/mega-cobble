@@ -1,10 +1,10 @@
 {
   "cobblemon.ability.megasol": "Mega Sol",
-  "cobblemon.ability.megasol.desc": "This Pokemon's moves act as if harsh sunlight is active: Fire-type power x1.5, Water-type power x0.5, and Solar Beam/Solar Blade fire in one turn with no weather penalty.",
+  "cobblemon.ability.megasol.desc": "This Pokemon uses its moves as if harsh sunlight were active, without changing the weather.",
   "cobblemon.ability.dragonize": "Dragonize",
-  "cobblemon.ability.dragonize.desc": "This Pokemon's Normal-type moves become Dragon-type and gain a small power boost.",
+  "cobblemon.ability.dragonize.desc": "This Pokemon's eligible Normal-type moves become Dragon-type and gain 20% power.",
   "cobblemon.ability.piercingdrill": "Piercing Drill",
-  "cobblemon.ability.piercingdrill.desc": "This Pokemon's contact moves strike through Protect and Detect.",
+  "cobblemon.ability.piercingdrill.desc": "This Pokemon's contact moves hit through protection for one quarter of normal damage.",
   "megacobble.ui.interact.mega": "Mega Evolve",
   "megacobble.feedback.applied": "Mega Evolved!",
   "megacobble.feedback.reverted": "Reverted to normal form.",
@@ -37,9 +37,11 @@
   "megacobble.command.variant.applied": "Applied variant '%s'.",
   "megacobble.command.variant.removed": "Removed variant '%s'.",
   "cobblemon.ability.eelevate": "Eelevate",
-  "cobblemon.ability.eelevate.desc": "This Pokemon is immune to Ground-type moves, and KOing a Pokemon raises its highest stat by 1.",
+  "cobblemon.ability.eelevate.desc": "This Pokemon floats above the ground. Knocking out a Pokemon with an attack raises its highest stat by 1.",
   "cobblemon.ability.firemane": "Fire Mane",
-  "cobblemon.ability.firemane.desc": "This Pokemon's Fire-type moves have 1.5x power.",
+  "cobblemon.ability.firemane.desc": "This Pokemon's Fire-type attacks are powered up by 50%.",
   "cobblemon.ability.spicyspray": "Spicy Spray",
-  "cobblemon.ability.spicyspray.desc": "When this Pokemon is hit by a damaging move, the attacker is burned."
+  "cobblemon.ability.spicyspray.desc": "When this Pokemon is hit by a damaging move, the attacker is burned.",
+  "cobblemon.ability.auraguard": "Aura Guard",
+  "cobblemon.ability.auraguard.desc": "Halves the damage this Pokemon takes from contact moves."
 }

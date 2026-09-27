@@ -1,11 +1,14 @@
 {
- "_comment": "Reference data for Pokemon Legends: Z-A / Champions Mega Evolutions. NOT YET IMPLEMENTED - stored for future use (Cobblemon 1.7.3 has no form data for these). Base stats from Serebii (Legends Z-A); types and abilities from Pokemon Champions. Stat keys use Cobblemon's FormData naming. null = not yet sourced.",
+ "_comment": "Shipped Legends: Z-A / Mega Dimension Mega form data. Ability audit: 2026-09-27, see docs/mega-abilities-audit.md. Stat keys use Cobblemon FormData naming; original stats/types are not covered by this ability audit.",
  "_statOrder": "hp / attack / defence / special_attack / special_defence / speed",
  "_newAbilities": {
-  "mega_sol": "Treats weather-dependent moves as if harsh sunlight is active.",
-  "dragonize": "Turns Normal-type moves into Dragon-type and boosts their power ~20%.",
-  "piercing_drill": "Contact moves bypass protection moves, dealing reduced damage through them.",
-  "spicy_spray": "Burns any attacker that lands a damaging move on this Pokemon."
+  "mega_sol": "Uses moves as if in sunlight without changing the field weather.",
+  "dragonize": "Converts eligible Normal moves to Dragon and boosts power by 20%.",
+  "piercing_drill": "Contact moves pierce protection for one quarter damage.",
+  "spicy_spray": "Burns the attacker after taking damage from a move.",
+  "eelevate": "Levitate-style airborne state plus a highest-stat boost on attack KOs.",
+  "fire_mane": "Boosts Fire attacks by 50%.",
+  "aura_guard": "Halves damage from contact moves."
  },
  "megas": [
   {
@@ -574,7 +577,7 @@
    "aspect": "mega-z",
    "type1": "dragon",
    "type2": null,
-   "ability": "sandveil",
+   "ability": "levitate",
    "baseStats": {
     "hp": 108,
     "attack": 130,
@@ -590,7 +593,7 @@
    "aspect": "mega-z",
    "type1": "fighting",
    "type2": "steel",
-   "ability": "steadfast",
+   "ability": "aura_guard",
    "baseStats": {
     "hp": 70,
     "attack": 100,
@@ -670,7 +673,7 @@
    "aspect": "mega",
    "type1": "bug",
    "type2": "steel",
-   "ability": "emergencyexit",
+   "ability": "toughclaws",
    "baseStats": {
     "hp": 75,
     "attack": 150,
@@ -702,7 +705,7 @@
    "aspect": "mega-z",
    "type1": "dark",
    "type2": "ghost",
-   "ability": "pressure",
+   "ability": "sharpness",
    "baseStats": {
     "hp": 65,
     "attack": 154,
@@ -729,6 +732,6 @@
    }
   }
  ],
- "_pending_comment": "All Z-A + Mega Dimension DLC mega formes are now shipped. Those that Pokemon Champions has NOT yet assigned a mega ability (Darkrai, Garchomp-Z, Lucario-Z, Heatran, Magearna, Zeraora, Baxcalibur, Golisopod, Tatsugiri, Absol-Z) temporarily KEEP their base-form primary ability as a placeholder; update the 'ability' field here when Champions reveals the real one, then re-run gen_custom_megas.py.",
+ "_pending_comment": "Provisional base abilities retained for Darkrai, Heatran, Magearna, Zeraora, Tatsugiri and Zygarde; matching upstream data alone is not confirmation of a Champions assignment. Garchomp-Z, Lucario-Z, Absol-Z, Golisopod and Baxcalibur now have confirmed abilities; see docs/mega-abilities-audit.md.",
  "pending": []
 }
