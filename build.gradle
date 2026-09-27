@@ -3,7 +3,7 @@ plugins {
 	// Applying the Kotlin plugin makes Loom remap the Kotlin @Metadata of mod dependencies
 	// (Cobblemon) into our mappings. Without this, Cobblemon's Kotlin reflection looks up
 	// intermediary names (e.g. net.minecraft.class_2960) that don't exist at dev runtime.
-	id 'org.jetbrains.kotlin.jvm' version '2.2.0'
+	id 'org.jetbrains.kotlin.jvm' version '2.2.20'
 	id 'maven-publish'
 }
 
@@ -38,7 +38,23 @@ repositories {
 	mavenCentral()
 }
 
+// Loom strips Minecraft's client-only ICU from server runs, but Cobblemon's GraalJS needs it.
+// Add Cobblemon's own ICU version after that filtering, only to development server launches.
+configurations {
+	showdownServerIcu {
+		canBeConsumed = false
+		transitive = false
+	}
+}
+
+tasks.withType(net.fabricmc.loom.task.AbstractRunTask).configureEach {
+	if (name.endsWith('Server')) {
+		classpath configurations.showdownServerIcu
+	}
+}
+
 dependencies {
+	showdownServerIcu 'com.ibm.icu:icu4j:71.1'
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	// Official Mojang mappings — matches the mappings Cobblemon is developed against,

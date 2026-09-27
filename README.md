@@ -1,6 +1,11 @@
-# Mega Cobble
+# Mega Cobble — Cobblemon 1.8 branch
 
-[![Build](https://github.com/Aaron-3005/mega-cobble/actions/workflows/build.yml/badge.svg)](https://github.com/Aaron-3005/mega-cobble/actions/workflows/build.yml)
+This is the independent **0.2.x** release line for **Cobblemon 1.8.1** on Minecraft 1.21.1.
+The [`main` branch](https://github.com/Aaron-3005/mega-cobble/tree/main) and **0.1.x** releases
+remain on Cobblemon 1.7.3. Use the matching JAR for your Cobblemon version.
+See [the 1.8 migration notes](docs/cobblemon-1.8.md).
+
+[![Build](https://github.com/Aaron-3005/mega-cobble/actions/workflows/build.yml/badge.svg?branch=cobblemon-1.8)](https://github.com/Aaron-3005/mega-cobble/actions/workflows/build.yml)
 
 A Fabric add-on that brings **Mega Evolution** to
 [Cobblemon](https://cobblemon.com/) — including a data-driven pipeline for adding
@@ -13,14 +18,14 @@ A Fabric add-on that brings **Mega Evolution** to
 
 ## Download
 
-- **[⬇ Latest jar](https://github.com/Aaron-3005/mega-cobble/releases/download/latest/megacobble-latest.jar)**
-  — `megacobble-latest.jar`, rebuilt on every push to `main`.
+- **[⬇ Latest jar](https://github.com/Aaron-3005/mega-cobble/releases/download/latest-cobblemon-1.8/megacobble-latest-cobblemon-1.8.jar)**
+  — `megacobble-latest-cobblemon-1.8.jar`, rebuilt on every push to `cobblemon-1.8`.
 - **[All releases](https://github.com/Aaron-3005/mega-cobble/releases)** — tagged `v*` versions get a
   permanent jar.
 
 Every build also uploads the installable versioned JAR as the **megacobble-jar** artifact on its
 Actions run (retained for 30 days). Sources and development JARs are excluded. Use **Actions →
-Build → Run workflow** on `main` to rebuild and refresh the rolling latest download manually.
+Build → Run workflow** on `cobblemon-1.8` to rebuild and refresh the rolling latest download manually.
 Version tags must match `mod_version` in `gradle.properties`; existing versioned release assets
 are preserved when a workflow is rerun. Release downloads remain available after build artifacts expire.
 
@@ -30,7 +35,7 @@ launch without them:
 1. [Fabric Loader](https://fabricmc.net/use/installer/)
 2. [Fabric API](https://modrinth.com/mod/fabric-api)
 3. [Fabric Language Kotlin](https://modrinth.com/mod/fabric-language-kotlin)
-4. [Cobblemon](https://modrinth.com/mod/cobblemon) **1.7.3** (Minecraft 1.21.1)
+4. [Cobblemon](https://modrinth.com/mod/cobblemon) **1.8.1** (Minecraft 1.21.1)
 5. this jar
 
 ## Features
@@ -249,7 +254,7 @@ data files and running the generators — no code changes.
 | Mod loader     | Fabric            |
 | Fabric Loader  | >= 0.17.2         |
 | Fabric API     | >= 0.116.6+1.21.1 |
-| Cobblemon      | 1.7.3+1.21.1      |
+| Cobblemon      | 1.8.1+1.21.1      |
 | Java           | 21                |
 
 ## Project layout
@@ -322,7 +327,7 @@ It refuses to run on a dirty tree, so commit your work (and any changelog notes)
 
 Cobblemon is pulled automatically from its
 [Maven repository](https://maven.impactdev.net/) at build time — you do **not** need a local
-jar to build. The provided `Cobblemon-fabric-1.7.3+1.21.1.jar` (~135 MB) is **git-ignored**
+jar to build. A local `Cobblemon-fabric-1.8.1+1.21.1.jar` is **git-ignored**
 and kept only as a local reference.
 
 ## Limitations / roadmap
@@ -334,7 +339,7 @@ and kept only as a local reference.
   Zygarde keep their base primary ability pending confirmed Champions assignments. The September
   2026 audit updated Garchomp Z to Levitate, Lucario Z to Aura Guard, Golisopod to Tough Claws and
   Absol Z to Sharpness; Baxcalibur's Thermal Exchange remains correct.
-- **New ability compatibility** is tested against Cobblemon 1.7.3's bundled simulator. Mega Sol and
+- **New ability compatibility** is tested against Cobblemon 1.8.1's bundled simulator. Mega Sol and
   Eelevate now use battle-local weather/grounding adapters, and Piercing Drill deals quarter damage
   through protection. Details, sources and remaining uncertainties are in
   **[the ability audit](docs/mega-abilities-audit.md)**. Re-run `python tools/test_mega_abilities.py`
@@ -355,6 +360,14 @@ and kept only as a local reference.
 ## Changelog
 
 Newest first.
+
+- **v0.2.0 — Cobblemon 1.8 release line.** Targets Cobblemon 1.8.1 with its Kotlin 2.2.20 runtime.
+  Branched from v0.1.3 with all Mega ability, UI and save/reload fixes; releases and rolling
+  downloads are separate from the maintained Cobblemon 1.7.3 line.
+  - Corrected Mega Meowstic's gender ratio so both genders keep their identity and revert correctly.
+  - Clean development servers now receive the ICU library required by Cobblemon's battle engine.
+  - Verified: Java 21 build, 28 simulator tests, all 93 form lifecycles, both Meowstic genders,
+    and 24 focused UI/ability/reload checks on Cobblemon 1.8.1.
 
 - **v0.1.3 — 2026-09-27: Mega ability corrections and roster audit (Cobblemon 1.7.3).**
   - Fixed Mega forms surviving logout/restart: the original aspects, nickname and ability now save

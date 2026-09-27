@@ -2,10 +2,10 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [cobblemon-1.8]
     tags: ['v*']
   pull_request:
-    branches: [main]
+    branches: [cobblemon-1.8]
   workflow_dispatch:
 
 permissions:
@@ -36,6 +36,13 @@ jobs:
       - name: Build
         run: bash ./gradlew build --no-daemon --stacktrace --max-workers=2
 
+      - name: Verify simulator mechanics
+        run: python3 tools/test_mega_abilities.py
+
+      - name: Verify Minecraft Mega lifecycles
+        timeout-minutes: 5
+        run: bash ./gradlew -PmegaAbilityTests runAbilityTestServer --no-daemon --stacktrace --max-workers=2
+
       - name: Verify and collect installable JAR
         run: python3 .github/scripts/prepare-artifact.py
 
@@ -53,7 +60,7 @@ jobs:
     needs: build
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+      (github.ref == 'refs/heads/cobblemon-1.8' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -69,29 +76,29 @@ jobs:
           path: dist
 
       - name: Update rolling latest release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/cobblemon-1.8'
         run: |
           set -euo pipefail
           shopt -s nullglob
           jars=(dist/megacobble-*.jar)
           [[ ${#jars[@]} -eq 1 ]]
-          cp "${jars[0]}" megacobble-latest.jar
-          if gh api "repos/$GH_REPO/git/ref/tags/latest" >/dev/null 2>&1; then
-            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/latest" \
+          cp "${jars[0]}" megacobble-latest-cobblemon-1.8.jar
+          if gh api "repos/$GH_REPO/git/ref/tags/latest-cobblemon-1.8" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/latest-cobblemon-1.8" \
               -f sha="$GITHUB_SHA" -F force=true
           else
             gh api --method POST "repos/$GH_REPO/git/refs" \
-              -f ref=refs/tags/latest -f sha="$GITHUB_SHA"
+              -f ref=refs/tags/latest-cobblemon-1.8 -f sha="$GITHUB_SHA"
           fi
-          printf 'Automatic Fabric build of commit `%s`. Requires Minecraft 1.21.1, Cobblemon 1.7.3, Fabric API and Fabric Language Kotlin.\n' "$GITHUB_SHA" > release-notes.md
-          if gh release view latest >/dev/null 2>&1; then
-            gh release edit latest --title 'Latest build (main)' --prerelease --notes-file release-notes.md
-            gh release upload latest megacobble-latest.jar --clobber
+          printf 'Automatic Fabric build of commit `%s`. Requires Minecraft 1.21.1, Cobblemon 1.8.1, Fabric API and Fabric Language Kotlin.\n' "$GITHUB_SHA" > release-notes.md
+          if gh release view latest-cobblemon-1.8 >/dev/null 2>&1; then
+            gh release edit latest-cobblemon-1.8 --title 'Latest build (Cobblemon 1.8)' --prerelease --notes-file release-notes.md
+            gh release upload latest-cobblemon-1.8 megacobble-latest-cobblemon-1.8.jar --clobber
           else
-            gh release create latest megacobble-latest.jar --verify-tag \
-              --title 'Latest build (main)' --prerelease --notes-file release-notes.md
+            gh release create latest-cobblemon-1.8 megacobble-latest-cobblemon-1.8.jar --verify-tag \
+              --title 'Latest build (Cobblemon 1.8)' --prerelease --notes-file release-notes.md
           fi
-          printf '### Download\n[megacobble-latest.jar](https://github.com/%s/releases/download/latest/megacobble-latest.jar)\n' "$GH_REPO" >> "$GITHUB_STEP_SUMMARY"
+          printf '### Download\n[megacobble-latest-cobblemon-1.8.jar](https://github.com/%s/releases/download/latest-cobblemon-1.8/megacobble-latest-cobblemon-1.8.jar)\n' "$GH_REPO" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish versioned release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -108,6 +115,6 @@ jobs:
             fi
           else
             gh release create "$GITHUB_REF_NAME" "${jars[0]}" --verify-tag \
-              --title "$GITHUB_REF_NAME" --generate-notes
+              --title "$GITHUB_REF_NAME (Cobblemon 1.8.1)" --generate-notes --latest=false
           fi
           printf '### Versioned release\n[%s](https://github.com/%s/releases/tag/%s)\n' "$GITHUB_REF_NAME" "$GH_REPO" "$GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"

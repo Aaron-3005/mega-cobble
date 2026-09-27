@@ -1,4 +1,4 @@
-// Run against the UNMODIFIED Showdown shipped in Cobblemon 1.7.3:
+// Run against the UNMODIFIED Showdown shipped in this branch's Cobblemon version:
 // node tools/test_mega_abilities.cjs <extracted-showdown-directory>
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

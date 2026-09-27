@@ -127,7 +127,7 @@ official-source audit of every custom stat/type assignment. Placeholder models r
 py -3 tools/gen_custom_megas.py
 py -3 tools/test_mega_abilities.py
 # Or supply another copy of the same Cobblemon version:
-py -3 tools/test_mega_abilities.py path/to/Cobblemon-fabric-1.7.3+1.21.1.jar
+py -3 tools/test_mega_abilities.py path/to/Cobblemon-fabric-1.8.1+1.21.1.jar
 ```
 
 Requires Python 3.9+ and Node.js. The Python runner extracts a fresh, unmodified
