@@ -94,6 +94,13 @@ this flattening to catch transport-specific syntax failures.
 
 ## Verification
 
+The Minecraft bridge explicitly applies the Mega form's ability and refreshes Cobblemon's separate
+battle-team snapshot. This fixes the summary showing the base ability (for example Sand Veil on
+Mega Garchomp Z). Both battle and world Mega reversion preserve the original ability and slot.
+With Java 21, `.\gradlew.bat -PmegaAbilityTests runAbilityTestServer` runs 12 lifecycle checks in an
+isolated headless server, including packet encode/decode and normal, hidden and forced abilities.
+It shuts down automatically; its test mod is excluded from the release JAR and ordinary client runs.
+
 ```powershell
 py -3 tools/gen_custom_megas.py
 py -3 tools/test_mega_abilities.py

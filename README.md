@@ -338,7 +338,9 @@ and kept only as a local reference.
   Eelevate now use battle-local weather/grounding adapters, and Piercing Drill deals quarter damage
   through protection. Details, sources and remaining uncertainties are in
   **[the ability audit](docs/mega-abilities-audit.md)**. Re-run `python tools/test_mega_abilities.py`
-  after ability changes or simulator upgrades.
+  after ability changes or simulator upgrades. With Java 21, run
+  `.\gradlew.bat -PmegaAbilityTests runAbilityTestServer` for the isolated Minecraft ability/UI
+  packet tests; the test server shuts down automatically and never loads your local test world.
 - **The original 19 Z-A megas' stats/types are unverified** — only their abilities were confirmed. The
   newer 25 use Serebii-verified numbers, so a stat/type pass on the original 19 would make the data set
   consistent.
@@ -352,6 +354,10 @@ and kept only as a local reference.
 Newest first.
 
 - **Unreleased — 2026-09-27: Mega ability corrections and roster audit.**
+  - Fixed the battle summary retaining the base ability after Mega Evolution (for example, Sand
+    Veil instead of Levitate on Mega Garchomp Z). Refresh the battle team snapshot and explicitly
+    apply the Mega ability, including when the base ability was command-forced. Battle and world
+    Mega reversion now restore the original ability and its hidden/forced slot.
   - Piercing Drill now deals **one quarter damage through protection**, per target, while keeping
     contact effects; noncontact moves and Max Guard retain their normal protection behavior.
   - Mega Sol now handles move-specific sunlight effects, weather damage without double stacking,
@@ -363,8 +369,9 @@ Newest first.
   - Audited all **45 custom and 48 classic Mega forms** against current references. Six custom
     assignments remain provisional. Editable ability sources now live in `tools/abilities/` and
     generate both the Cobblemon registrations and Showdown definitions.
-  - **Validation:** 27 simulator regression tests pass, including ten Mega transformations;
-    Java 21 build passes. Minecraft-side testing remains pending.
+  - **Validation:** 27 simulator regression tests and 12 Minecraft ability lifecycle checks pass,
+    including battle-summary packet serialization, hidden/forced base abilities and reversion.
+    Java 21 build passes; visual UI retesting and coverage of every species remain pending.
     See [the full audit](docs/mega-abilities-audit.md) for sources and remaining uncertainties.
 
 - **v0.1.2 — stoneless Mega Rayquaza (in-battle + overworld).** Rayquaza Mega Evolves with **no Mega

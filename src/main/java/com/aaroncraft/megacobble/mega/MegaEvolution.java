@@ -5,6 +5,8 @@ import com.aaroncraft.megacobble.config.MegaCobbleConfig;
 import com.aaroncraft.megacobble.item.MegaItems;
 import com.aaroncraft.megacobble.item.MegaStones;
 import com.cobblemon.mod.common.Cobblemon;
+import com.cobblemon.mod.common.api.abilities.Ability;
+import com.cobblemon.mod.common.api.abilities.PotentialAbility;
 import com.cobblemon.mod.common.api.moves.Move;
 import com.cobblemon.mod.common.api.battles.model.PokemonBattle;
 import com.cobblemon.mod.common.api.battles.model.actor.BattleActor;
@@ -61,7 +63,7 @@ public final class MegaEvolution {
      */
     private static final Map<UUID, BattleMega> BATTLE_MEGAS = new ConcurrentHashMap<>();
 
-    private record Original(Set<String> forcedAspects, MutableComponent nickname) {}
+    private record Original(Set<String> forcedAspects, MutableComponent nickname, Ability ability) {}
 
     private record BattleMega(Pokemon pokemon, PokemonBattle battle) {}
 
@@ -106,19 +108,46 @@ public final class MegaEvolution {
         if (megaForm == null) {
             return;
         }
-        MEGA_STATES.put(target.getUuid(),
-            new Original(new HashSet<>(target.getForcedAspects()), target.getNickname()));
+        MEGA_STATES.putIfAbsent(target.getUuid(),
+            new Original(new HashSet<>(target.getForcedAspects()), target.getNickname(), target.getAbility()));
         BATTLE_MEGAS.put(target.getUuid(), new BattleMega(target, battle));
 
         Set<String> forced = new HashSet<>(target.getForcedAspects());
         forced.addAll(megaForm.getAspects());
         target.setForcedAspects(forced);
         target.setForm(megaForm);
+        applyMegaAbility(target, megaForm);
         target.setNickname(Component.literal(buildMegaName(target.getSpecies().getName(), megaForm.getName())));
+        refreshBattleTeam(target, battle);
         refreshBattleName(target, battle);
 
-        MegaCobble.LOGGER.info("[Mega Cobble] In-battle mega: {} -> {} ({}).",
-            target.getSpecies().getName(), megaForm.getName(), target.getUuid());
+        MegaCobble.LOGGER.info("[Mega Cobble] In-battle mega: {} -> {} with ability {} ({}).",
+            target.getSpecies().getName(), megaForm.getName(), target.getAbility().getName(), target.getUuid());
+    }
+
+    /** Forced base abilities bypass Cobblemon's automatic form update; explicitly use the Mega slot. */
+    private static void applyMegaAbility(Pokemon pokemon, FormData megaForm) {
+        for (PotentialAbility potential : megaForm.getAbilities()) {
+            if (potential.getTemplate() != null) {
+                pokemon.updateAbility(potential.getTemplate().create(false, potential.getPriority()));
+                return;
+            }
+        }
+    }
+
+    /**
+     * The battle summary uses a separate team snapshot, not the party object or active HUD tile.
+     * Refresh that snapshot for its owner as well as the ordinary Pokemon update packets.
+     */
+    private static void refreshBattleTeam(Pokemon pokemon, PokemonBattle battle) {
+        for (BattleActor actor : battle.getActors()) {
+            for (BattlePokemon member : actor.getPokemonList()) {
+                if (member.getEffectedPokemon().getUuid().equals(pokemon.getUuid())) {
+                    member.sendUpdate();
+                    return;
+                }
+            }
+        }
     }
 
     /**
@@ -152,13 +181,18 @@ public final class MegaEvolution {
      * syncs to the client automatically.
      */
     public static void revert(Pokemon pokemon) {
-        BATTLE_MEGAS.remove(pokemon.getUuid());
+        BattleMega battleMega = BATTLE_MEGAS.remove(pokemon.getUuid());
         Original original = MEGA_STATES.remove(pokemon.getUuid());
         if (original == null) {
             return;
         }
         pokemon.setForcedAspects(original.forcedAspects());
+        // Preserve the exact base slot, including hidden and command-forced abilities.
+        pokemon.setAbility$common(original.ability());
         pokemon.setNickname(original.nickname());
+        if (battleMega != null && !battleMega.battle().getEnded()) {
+            refreshBattleTeam(pokemon, battleMega.battle());
+        }
         MegaCobble.LOGGER.info("[Mega Cobble] Reverted {} ({}) to normal form.",
             pokemon.getSpecies().getName(), pokemon.getUuid());
     }
@@ -252,12 +286,13 @@ public final class MegaEvolution {
         inheritRidingFromSpecies(megaForm);
 
         WORLD_MEGA_STATES.put(target.getUuid(),
-            new Original(new HashSet<>(target.getForcedAspects()), target.getNickname()));
+            new Original(new HashSet<>(target.getForcedAspects()), target.getNickname(), target.getAbility()));
 
         Set<String> forced = new HashSet<>(target.getForcedAspects());
         forced.addAll(megaForm.getAspects());
         target.setForcedAspects(forced);
         target.setForm(megaForm);
+        applyMegaAbility(target, megaForm);
         target.setNickname(Component.literal(buildMegaName(target.getSpecies().getName(), megaForm.getName())));
 
         MegaCobble.LOGGER.info("[Mega Cobble] World mega: {} -> {} ({}).",
@@ -272,6 +307,7 @@ public final class MegaEvolution {
             return false;
         }
         pokemon.setForcedAspects(original.forcedAspects());
+        pokemon.setAbility$common(original.ability());
         pokemon.setNickname(original.nickname());
         MegaCobble.LOGGER.info("[Mega Cobble] Reverted world mega {} ({}).",
             pokemon.getSpecies().getName(), pokemon.getUuid());

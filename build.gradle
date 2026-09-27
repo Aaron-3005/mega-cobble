@@ -14,6 +14,11 @@ base {
 	archivesName = project.archives_base_name
 }
 
+// Isolated integration tests use the real Cobblemon data and packet types; never ship the test mod.
+if (project.hasProperty('megaAbilityTests')) {
+	apply from: 'tools/mega-ability-tests.gradle'
+}
+
 repositories {
 	// Cobblemon is published here
 	maven {
