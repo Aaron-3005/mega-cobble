@@ -106,6 +106,23 @@ isolated headless server: 12 lifecycles, 8 save/reloads and 4 legacy repairs, in
 encode/decode and normal, hidden and forced abilities.
 It shuts down automatically; its test mod is excluded from the release JAR and ordinary client runs.
 
+### Comparison with previously implemented Megas
+
+All **48 classic** forms and **45 custom** forms pass the same Minecraft lifecycle checks:
+
+- Correct form and primary ability in battle and out of battle, including forced base abilities.
+- Battle-summary packets preserve the ability, form stats and typing after encode/decode.
+- Reversion preserves the original ability slot, nickname and required base-form aspects.
+- Saving either kind of Mega and recovering the reloaded Pokémon restores its original state.
+- The roster includes Charizard/Mewtwo X/Y, the Z forms, Eternal Flower Floette, Complete Zygarde
+  and stoneless Rayquaza with Dragon Ascent.
+
+The 28 simulator tests also exercise all 93 actual Mega transformations. Classic forms retain
+the bundled simulator's stats, types and abilities; custom forms use their configured data.
+No additional production discrepancy was found in this comparison. These checks establish
+implementation consistency, not external confirmation of the six provisional abilities or a new
+official-source audit of every custom stat/type assignment. Placeholder models remain unchanged.
+
 ```powershell
 py -3 tools/gen_custom_megas.py
 py -3 tools/test_mega_abilities.py
@@ -120,6 +137,6 @@ already extracted simulator directory as its argument.
 
 The suite covers generated data consistency, all seven custom abilities,
 weather/grounding/suppression, protection and doubles targeting, Skill Swap,
-and ten actual simulator Mega transformations. It runs on Node.js using the
+and all 93 actual simulator Mega transformations. It runs on Node.js using the
 Cobblemon simulator, not through the Minecraft client. Manual server/client
 battle checks remain useful, especially with other mods that change the sim.

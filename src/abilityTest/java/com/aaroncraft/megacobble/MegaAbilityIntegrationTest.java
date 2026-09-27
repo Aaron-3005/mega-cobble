@@ -15,6 +15,7 @@ import com.cobblemon.mod.common.battles.BattleSide;
 import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
 import com.cobblemon.mod.common.net.messages.client.battle.BattleUpdateTeamPokemonPacket;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import com.cobblemon.mod.common.pokemon.FormData;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import io.netty.buffer.Unpooled;
@@ -52,8 +53,9 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
                 for (String ability : List.of("sandveil", "levitate")) {
                     for (boolean forced : List.of(false, true)) checkLegacyRecovery(ability, forced);
                 }
-                Files.writeString(Path.of("ability-tests-passed.txt"), "12 ability lifecycles + 8 reloads + 4 legacy recoveries passed\n");
-                MegaCobble.LOGGER.info("[Mega ability tests] PASS: 12 ability lifecycles + 8 reloads + 4 legacy recoveries");
+                checkFullRoster();
+                Files.writeString(Path.of("ability-tests-passed.txt"), "24 focused checks + all 93 Mega form lifecycles passed\n");
+                MegaCobble.LOGGER.info("[Mega ability tests] PASS: 24 focused checks + all 93 Mega form lifecycles");
             } catch (Exception | AssertionError failure) {
                 MegaCobble.LOGGER.error("[Mega ability tests] FAIL", failure);
             } finally {
@@ -106,6 +108,79 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
 
     private static void check(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
+    }
+
+    private static void checkFullRoster() {
+        check(MegaStones.all().size() == 92, "Unexpected Mega Stone count");
+        for (MegaStones.MegaStone stone : MegaStones.all()) {
+            Pokemon pokemon = PokemonProperties.Companion.parse(stone.species()).create();
+            if (stone.requiredAspect() != null) pokemon.setForcedAspects(java.util.Set.of(stone.requiredAspect()));
+            pokemon.swapHeldItem(MegaItems.createStone(stone), false, false);
+            check(MegaEvolution.stoneMatches(stone, pokemon), "Stone rejected its required base form: " + stone.stoneId());
+            checkRosterForm(pokemon, stone.form());
+        }
+        Pokemon rayquaza = PokemonProperties.Companion.parse("rayquaza moves=dragonascent").create();
+        check(MegaEvolution.knowsStonelessMegaMove(rayquaza), "Rayquaza test did not learn Dragon Ascent");
+        checkRosterForm(rayquaza, "Mega");
+    }
+
+    private static void checkRosterForm(Pokemon pokemon, String formName) {
+        String label = pokemon.getSpecies().getName() + " " + formName;
+        try {
+            FormData mega = MegaEvolution.findFormByName(pokemon, formName);
+            check(mega != null, "Missing form");
+            String expectedAbility = mega.getAbilities().iterator().next().getTemplate().getName();
+            FormData base = pokemon.getForm();
+            Ability original = pokemon.getAbility();
+            var aspects = new java.util.HashSet<>(pokemon.getForcedAspects());
+            pokemon.setNickname(Component.literal("Partner"));
+            // Check the previously broken forced-ability path on every classic and custom form.
+            original.setForced$common(true);
+            RecordingActor owner = new RecordingActor(pokemon);
+            PokemonBattle battle = new PokemonBattle(BattleFormat.Companion.getGEN_9_SINGLES(),
+                new BattleSide(owner), new BattleSide());
+            MegaEvolution.applyMega(pokemon, battle);
+            check(pokemon.getForm() == mega, "Wrong Mega form selected");
+            check(pokemon.getAbility().getName().equals(expectedAbility), "Wrong Mega ability");
+            check(owner.abilities.equals(List.of(expectedAbility)), "Battle summary did not receive Mega ability");
+            CompoundTag battleSave = pokemon.saveToNBT(registries, new CompoundTag());
+            MegaEvolution.revert(pokemon);
+            checkRestored(pokemon, base, original, aspects);
+            checkReloadedRoster(battleSave, base, original, aspects);
+
+            boolean keyRequired = MegaCobbleConfig.get().requireKeyStone;
+            MegaCobbleConfig.get().requireKeyStone = false;
+            try {
+                check(MegaEvolution.applyWorldMega(null, pokemon) == MegaEvolution.WorldMegaResult.APPLIED,
+                    "World Mega rejected correct species/form/item");
+                check(pokemon.getForm() == mega && pokemon.getAbility().getName().equals(expectedAbility),
+                    "World Mega disagrees with battle Mega");
+                CompoundTag worldSave = pokemon.saveToNBT(registries, new CompoundTag());
+                MegaEvolution.revertWorldMega(pokemon);
+                checkRestored(pokemon, base, original, aspects);
+                checkReloadedRoster(worldSave, base, original, aspects);
+            } finally {
+                MegaCobbleConfig.get().requireKeyStone = keyRequired;
+            }
+        } catch (AssertionError | RuntimeException failure) {
+            throw new AssertionError(label + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    private static void checkRestored(Pokemon pokemon, FormData base, Ability ability, java.util.Set<String> aspects) {
+        check(pokemon.getForm() == base, "Reversion lost the base form");
+        check(pokemon.getAbility().getName().equals(ability.getName())
+            && pokemon.getAbility().getForced() == ability.getForced()
+            && pokemon.getAbility().getPriority() == ability.getPriority()
+            && pokemon.getAbility().getIndex() == ability.getIndex(), "Reversion lost the original ability slot");
+        check(pokemon.getForcedAspects().equals(aspects), "Reversion lost required base aspects");
+        check(pokemon.getNickname().getString().equals("Partner"), "Reversion lost the nickname");
+    }
+
+    private static void checkReloadedRoster(CompoundTag saved, FormData base, Ability ability, java.util.Set<String> aspects) {
+        Pokemon loaded = new Pokemon().loadFromNBT(registries, saved);
+        MegaEvolution.recoverOrphanedMega(loaded);
+        checkRestored(loaded, base, ability, aspects);
     }
 
     private static void checkReload(String properties, boolean forced, boolean world) {
@@ -185,6 +260,11 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
                     abilities.add(received.getAbility().getName());
                     check(received.getForm().getName().equals(update.getPokemon().getForm().getName()),
                         "Battle summary packet lost the form");
+                    check(received.getForm().getBaseStats().equals(update.getPokemon().getForm().getBaseStats()),
+                        "Battle summary packet lost the form's stats");
+                    check(received.getForm().getPrimaryType().equals(update.getPokemon().getForm().getPrimaryType())
+                        && java.util.Objects.equals(received.getForm().getSecondaryType(),
+                            update.getPokemon().getForm().getSecondaryType()), "Battle summary packet lost typing");
                 } finally {
                     buffer.release();
                 }

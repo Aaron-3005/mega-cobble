@@ -291,23 +291,48 @@ test('compatibility follows Skill Swap and ability suppression dynamically', () 
   target.setAbility('noability');
   assert.equal(source.isGrounded(), false);
 });
-test('new and reassigned abilities activate through actual Mega Evolution', () => {
+test('all 48 classic forms retain their bundled stats, typing and ability through Mega Evolution', () => {
+  const dex = require(path.join(sim, 'sim/dex')).Dex;
+  const custom = JSON.parse(fs.readFileSync(path.join(resources, 'za_megas.json'))).megas;
+  const stones = JSON.parse(fs.readFileSync(path.join(resources, 'megastones.json')))
+    .filter(stone => !custom.some(entry => entry.species === stone.species && entry.form === stone.form));
+  assert.equal(stones.length, 47);
+  Cobblemon.registries.heldItem.register(Function(`return (${injections.heldItem.rayquazite});`)(), 'rayquazite');
+  stones.push({ species: 'rayquaza', form: 'Mega', name: 'Rayquazite' });
+  for (const stone of stones) {
+    const base = dex.species.get(stone.species);
+    const expected = dex.species.get(`${base.name}-${stone.form}`);
+    assert.ok(expected.exists, `${base.name}-${stone.form}`);
+    const moves = stone.species === 'rayquaza' ? ['splash', 'dragonascent'] : ['splash'];
+    const b = battle(mon(base.abilities[0], moves, { species: base.name, item: stone.name }), mon());
+    b.makeChoices('move 1 mega', 'move 1');
+    const mega = b.p1.active[0];
+    assert.equal(mega.species.name, expected.name);
+    assert.equal(mega.ability, dex.abilities.get(expected.abilities[0]).id, expected.name);
+    assert.deepEqual(mega.species.baseStats, expected.baseStats);
+    assert.deepEqual(mega.species.types, expected.types);
+  }
+});
+
+test('all 45 custom forms activate their assigned ability through actual Mega Evolution', () => {
   const dex = require(path.join(sim, 'sim/dex')).Dex;
   for (const [id, js] of Object.entries(injections.heldItem)) {
     Cobblemon.registries.heldItem.register(Function(`return (${js});`)(), id);
   }
   const roster = JSON.parse(fs.readFileSync(path.join(resources, 'za_megas.json'))).megas;
   const stones = JSON.parse(fs.readFileSync(path.join(resources, 'megastones.json')));
-  for (const species of ['meganium', 'eelektross', 'excadrill', 'feraligatr', 'pyroar', 'scovillain', 'lucario', 'garchomp', 'absol', 'golisopod']) {
-    const entry = roster.find(e => e.species === species);
+  assert.equal(roster.length, 45);
+  for (const entry of roster) {
+    const species = entry.species;
     const stone = stones.find(s => s.species === species && s.form === entry.form);
-    const form = JSON.parse(fs.readFileSync(path.join(resources, 'data/cobblemon/species_additions', `${species}_mega.json`))).forms[0];
+    const form = JSON.parse(fs.readFileSync(path.join(resources, 'data/cobblemon/species_additions', `${species}_mega.json`))).forms.find(f => f.name === entry.form);
     const base = dex.species.get(species);
     const name = `${base.name}-${form.name}`;
     // Mirror Cobblemon's species synchronization plus fixMegaAbilities().
     Cobblemon.registries.species.register({
       ...base, name, baseSpecies: base.name, forme: form.name,
-      types: [form.primaryType, form.secondaryType].filter(Boolean),
+      types: [form.primaryType, form.secondaryType].filter(Boolean)
+        .map(type => type[0].toUpperCase() + type.slice(1)),
       abilities: { 0: form.abilities[0] }, requiredItem: form.requiredItem, battleOnly: base.name,
       baseStats: { hp: form.baseStats.hp, atk: form.baseStats.attack, def: form.baseStats.defence,
         spa: form.baseStats.special_attack, spd: form.baseStats.special_defence, spe: form.baseStats.speed },
@@ -317,6 +342,12 @@ test('new and reassigned abilities activate through actual Mega Evolution', () =
     const mega = b.p1.active[0];
     assert.equal(mega.species.name, name);
     assert.equal(mega.ability, entry.ability.replaceAll('_', ''));
+    assert.deepEqual(mega.species.types, [form.primaryType, form.secondaryType].filter(Boolean)
+      .map(type => type[0].toUpperCase() + type.slice(1)));
+    assert.deepEqual(mega.species.baseStats, {
+      hp: form.baseStats.hp, atk: form.baseStats.attack, def: form.baseStats.defence,
+      spa: form.baseStats.special_attack, spd: form.baseStats.special_defence, spe: form.baseStats.speed,
+    });
     if (species === 'eelektross') assert.equal(mega.isGrounded(), false);
     if (['meganium', 'eelektross', 'excadrill'].includes(species)) assert.ok(b.megacobbleAbilities);
   }

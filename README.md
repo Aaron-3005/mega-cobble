@@ -345,7 +345,10 @@ and kept only as a local reference.
   newer 25 use Serebii-verified numbers, so a stat/type pass on the original 19 would make the data set
   consistent.
 - **In-game coverage is incomplete.** Automated simulator tests cover all seven custom abilities
-  and ten Mega transformations, including the Z forms. This does not replace Minecraft-side testing
+  and all 93 Mega transformations. Headless Minecraft tests compare all 48 classic and 45 custom
+  forms for battle/world transformation, ability and UI synchronization, reversion and save/reload
+  recovery, including the required Floette/Zygarde forms and stoneless Rayquaza.
+  This does not replace visual client testing
   of every species, multi-form variant, or interaction with other mods.
 - **Mega Floette** applies only to AZ's Eternal-Flower Floette (`flower-eternal`) via `requiredAspect`.
 
@@ -374,7 +377,9 @@ Newest first.
   - Audited all **45 custom and 48 classic Mega forms** against current references. Six custom
     assignments remain provisional. Editable ability sources now live in `tools/abilities/` and
     generate both the Cobblemon registrations and Showdown definitions.
-  - **Validation:** 27 simulator regression tests and 24 Minecraft checks pass: 12 ability
+  - **Validation:** 28 simulator regression tests cover all 93 Mega transformations. All 93 forms
+    also pass Minecraft battle/world lifecycle, UI packet and save/reload comparisons with the
+    previously implemented Megas. Another 24 focused Minecraft checks pass: 12 ability
     lifecycles, 8 save/reload recoveries and 4 legacy-save recoveries. Coverage includes battle-summary
     packet serialization, hidden/forced base abilities, styled nicknames and unrelated skin aspects.
     Java 21 build passes; visual UI retesting and coverage of every species remain pending.
