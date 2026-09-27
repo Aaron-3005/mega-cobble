@@ -356,7 +356,7 @@ and kept only as a local reference.
 
 Newest first.
 
-- **Unreleased — 2026-09-27: Mega ability corrections and roster audit.**
+- **v0.1.3 — 2026-09-27: Mega ability corrections and roster audit (Cobblemon 1.7.3).**
   - Fixed Mega forms surviving logout/restart: the original aspects, nickname and ability now save
     with the Pokémon and recover on login/send-out or before a new battle. Older stuck saves with
     the mod's generated Mega nickname and forced Mega aspect are also repaired. Those old saves
