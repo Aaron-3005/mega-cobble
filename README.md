@@ -1,6 +1,6 @@
 # Mega Cobble — Cobblemon 1.8 branch
 
-This is the independent **0.2.x** release line for **Cobblemon 1.8.1** on Minecraft 1.21.1.
+This is the independent **0.2.x** release line for **Cobblemon 1.8.2** on Minecraft 1.21.1.
 The [`main` branch](https://github.com/Aaron-3005/mega-cobble/tree/main) and **0.1.x** releases
 remain on Cobblemon 1.7.3. Use the matching JAR for your Cobblemon version.
 See [the 1.8 migration notes](docs/cobblemon-1.8.md).
@@ -35,7 +35,7 @@ launch without them:
 1. [Fabric Loader](https://fabricmc.net/use/installer/)
 2. [Fabric API](https://modrinth.com/mod/fabric-api)
 3. [Fabric Language Kotlin](https://modrinth.com/mod/fabric-language-kotlin)
-4. [Cobblemon](https://modrinth.com/mod/cobblemon) **1.8.1** (Minecraft 1.21.1)
+4. [Cobblemon](https://modrinth.com/mod/cobblemon) **1.8.2** (Minecraft 1.21.1)
 5. this jar
 
 ## Features
@@ -254,7 +254,7 @@ data files and running the generators — no code changes.
 | Mod loader     | Fabric            |
 | Fabric Loader  | >= 0.17.2         |
 | Fabric API     | >= 0.116.6+1.21.1 |
-| Cobblemon      | 1.8.1+1.21.1      |
+| Cobblemon      | 1.8.2+1.21.1      |
 | Java           | 21                |
 
 ## Project layout
@@ -327,7 +327,7 @@ It refuses to run on a dirty tree, so commit your work (and any changelog notes)
 
 Cobblemon is pulled automatically from its
 [Maven repository](https://maven.impactdev.net/) at build time — you do **not** need a local
-jar to build. A local `Cobblemon-fabric-1.8.1+1.21.1.jar` is **git-ignored**
+jar to build. A local `Cobblemon-fabric-1.8.2+1.21.1.jar` is **git-ignored**
 and kept only as a local reference.
 
 ## Limitations / roadmap
@@ -339,7 +339,7 @@ and kept only as a local reference.
   Zygarde keep their base primary ability pending confirmed Champions assignments. The September
   2026 audit updated Garchomp Z to Levitate, Lucario Z to Aura Guard, Golisopod to Tough Claws and
   Absol Z to Sharpness; Baxcalibur's Thermal Exchange remains correct.
-- **New ability compatibility** is tested against Cobblemon 1.8.1's bundled simulator. Mega Sol and
+- **New ability compatibility** is tested against Cobblemon 1.8.2's bundled simulator. Mega Sol and
   Eelevate now use battle-local weather/grounding adapters, and Piercing Drill deals quarter damage
   through protection. Details, sources and remaining uncertainties are in
   **[the ability audit](docs/mega-abilities-audit.md)**. Re-run `python tools/test_mega_abilities.py`
@@ -360,6 +360,18 @@ and kept only as a local reference.
 ## Changelog
 
 Newest first.
+
+- **v0.2.1 — 2026-10-21: Cobblemon 1.8.2 compatibility.** Requires Cobblemon 1.8.2
+  on Minecraft 1.21.1; use v0.2.0 for Cobblemon 1.8.1.
+  - Reverts battle Megas through Cobblemon's new `BATTLE_ENDED` event, including stopped battles.
+    Existing early cleanup and the tick fallback remain in place.
+  - Prevents 1.8.2's ordinary form-change cleanup from deleting learned moves during temporary
+    Mega changes or reload (including Eternal Floette's Light of Ruin and female Meowstic's moves).
+    Keeps current PP and PP Ups; normal form-change move rules still apply outside Mega transitions.
+  - Extends regression coverage to active/benched moves, PP and PP Ups across Mega evolution,
+    reversion and save/reload, plus riding-seat inheritance and immediate stopped-battle cleanup.
+  - Verified: Java 21 build, 28 simulator tests, all 93 form/move lifecycles, both Meowstic genders,
+    24 focused ability/UI/reload checks, stopped-battle cleanup and ordinary Rotom form changes.
 
 - **v0.2.0 — Cobblemon 1.8 release line.** Targets Cobblemon 1.8.1 with its Kotlin 2.2.20 runtime.
   Branched from v0.1.3 with all Mega ability, UI and save/reload fixes; releases and rolling

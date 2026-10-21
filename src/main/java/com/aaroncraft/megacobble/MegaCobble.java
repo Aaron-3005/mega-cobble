@@ -104,7 +104,9 @@ public class MegaCobble implements ModInitializer {
 		CobblemonEvents.MEGA_EVOLUTION.subscribe(event ->
 			MegaEvolution.applyMega(event.getPokemon().getEffectedPokemon(), event.getBattle()));
 
-		// Mega Evolution is temporary: revert when the battle ends, is fled, or the Pokémon faints.
+		// 1.8.2 reports every battle ending, including captures, forfeits and forced stops.
+		CobblemonEvents.BATTLE_ENDED.subscribe(event -> MegaEvolution.revertBattle(event.getBattle()));
+		// Keep the earlier victory/flee hooks for immediate cleanup, and revert on fainting.
 		CobblemonEvents.BATTLE_VICTORY.subscribe(event -> MegaEvolution.revertBattle(event.getBattle()));
 		CobblemonEvents.BATTLE_FLED.subscribe(event -> MegaEvolution.revertBattle(event.getBattle()));
 		CobblemonEvents.BATTLE_FAINTED.subscribe(event -> MegaEvolution.revert(event.getKilled().getEffectedPokemon()));
@@ -116,9 +118,8 @@ public class MegaCobble implements ModInitializer {
 		CobblemonEvents.POKEMON_SENT_PRE.subscribe(event -> MegaEvolution.recoverOrphanedMega(event.getPokemon()));
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> MegaEvolution.clearSessionState());
 
-		// Safety net: BATTLE_VICTORY/FLED only fire on a win or flee. Battles that end any other way
-		// (custom, forced, drawn) post no event, so reconcile every tick — revert any in-battle mega
-		// whose battle has ended. Cheap: a no-op unless something is currently mega-evolved in battle.
+		// Safety net for addon battles that mark themselves ended without posting BATTLE_ENDED.
+		// Cheap: a no-op unless something is currently mega-evolved in battle.
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			MegaEvolution.revertEndedBattleMegas();
 			// Per-player battle-damage readout (opt in with /megacobble damage on). No-op if nobody opted in.

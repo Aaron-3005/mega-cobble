@@ -310,8 +310,7 @@ public final class MegaEvolution {
     }
 
     /**
-     * Safety net for battles that end without a {@code BATTLE_VICTORY}/{@code BATTLE_FLED} event —
-     * custom, forced, or drawn battles end via {@code PokemonBattle.end()}, which posts no event. Once
+     * Safety net for addon battles that bypass the normal {@code BATTLE_ENDED} event. Once
      * a tracked in-battle mega's battle is over (ended, or removed from the registry), revert it.
      * Called every server tick; a no-op unless something is currently mega-evolved in battle.
      */

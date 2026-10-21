@@ -5,6 +5,7 @@ import com.aaroncraft.megacobble.item.MegaItems;
 import com.aaroncraft.megacobble.item.MegaStones;
 import com.aaroncraft.megacobble.mega.MegaEvolution;
 import com.cobblemon.mod.common.api.abilities.Ability;
+import com.cobblemon.mod.common.api.moves.BenchedMove;
 import com.cobblemon.mod.common.api.battles.model.PokemonBattle;
 import com.cobblemon.mod.common.api.battles.model.actor.ActorType;
 import com.cobblemon.mod.common.api.battles.model.actor.BattleActor;
@@ -54,8 +55,10 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
                     for (boolean forced : List.of(false, true)) checkLegacyRecovery(ability, forced);
                 }
                 checkFullRoster();
-                Files.writeString(Path.of("ability-tests-passed.txt"), "24 focused checks + all 93 Mega form lifecycles passed\n");
-                MegaCobble.LOGGER.info("[Mega ability tests] PASS: 24 focused checks + all 93 Mega form lifecycles");
+                checkStoppedBattle();
+                checkOrdinaryFormMoves();
+                Files.writeString(Path.of("ability-tests-passed.txt"), "24 focused checks + all 93 Mega form/move lifecycles + stopped-battle cleanup passed\n");
+                MegaCobble.LOGGER.info("[Mega ability tests] PASS: 24 focused checks + all 93 Mega form/move lifecycles + stopped-battle cleanup");
             } catch (Exception | AssertionError failure) {
                 MegaCobble.LOGGER.error("[Mega ability tests] FAIL", failure);
             } finally {
@@ -110,6 +113,63 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
         if (!condition) throw new AssertionError(message);
     }
 
+    private static void checkStoppedBattle() {
+        Pokemon pokemon = PokemonProperties.Companion.parse("garchomp ability=roughskin").create();
+        pokemon.swapHeldItem(MegaItems.createStone(MegaStones.byStoneId("garchompite_z")), false, false);
+        FormData base = pokemon.getForm();
+        Ability ability = pokemon.getAbility();
+        PokemonBattle battle = new PokemonBattle(BattleFormat.Companion.getGEN_9_SINGLES(),
+            new BattleSide(new RecordingActor(pokemon)), new BattleSide());
+        MegaEvolution.applyMega(pokemon, battle);
+        check(pokemon.getForm() != base, "Stopped-battle test did not Mega evolve");
+        pokemon.getMoveSet().getMoves().getFirst().setCurrentPp(0);
+        // Exercise Cobblemon's actual end path, without victory/flee events or our tick fallback.
+        battle.end();
+        check(pokemon.getForm() == base && pokemon.getAbility() == ability,
+            "BATTLE_ENDED did not immediately restore the original form and ability");
+        check(!pokemon.getPersistentData().contains("megacobble:original"), "Battle end left its recovery marker");
+        check(pokemon.getMoveSet().getMoves().getFirst().getCurrentPp() == 0, "Battle reversion refunded spent PP");
+        MegaEvolution.revertBattle(battle);
+        check(pokemon.getAbility() == ability, "Repeated cleanup changed the restored ability");
+    }
+
+    private static void checkOrdinaryFormMoves() {
+        for (boolean marker : List.of(false, true)) {
+            Pokemon pokemon = PokemonProperties.Companion.parse("rotom moves=overheat,thunderbolt").create();
+            FormData base = pokemon.getForm();
+            FormData heat = MegaEvolution.findFormByName(pokemon, "Heat");
+            check(heat != null, "Missing Heat Rotom test fixture");
+            pokemon.setForm(heat);
+            if (marker) pokemon.getPersistentData().put("megacobble:original", new CompoundTag());
+            pokemon.setForm(base);
+            check(pokemon.getMoveSet().getMoves().stream().noneMatch(move -> move.getName().equals("overheat")),
+                "Mega move hook disabled ordinary form-specific move removal");
+            check(pokemon.getMoveSet().getMoves().stream().anyMatch(move -> move.getName().equals("thunderbolt")),
+                "Ordinary form change lost a shared move");
+        }
+    }
+
+    private record MoveState(List<String> active, List<String> benched) {
+        static MoveState of(Pokemon pokemon) {
+            List<String> active = new ArrayList<>();
+            for (int slot = 0; slot < 4; slot++) {
+                var move = pokemon.getMoveSet().get(slot);
+                active.add(move == null ? "empty" : move.getName() + ":" + move.getCurrentPp() + ":" + move.getRaisedPpStages());
+            }
+            List<String> benched = new ArrayList<>();
+            for (var move : pokemon.getBenchedMoves()) {
+                benched.add(move.getMoveTemplate().getName() + ":" + move.getPpRaisedStages());
+            }
+            benched.sort(String::compareTo);
+            return new MoveState(active, benched);
+        }
+
+        void checkUnchanged(Pokemon pokemon) {
+            MoveState actual = of(pokemon);
+            check(equals(actual), "Mega lifecycle changed moves: expected " + this + ", got " + actual);
+        }
+    }
+
     private static void checkFullRoster() {
         check(MegaStones.all().size() == 92, "Unexpected Mega Stone count");
         for (MegaStones.MegaStone stone : MegaStones.all()) {
@@ -132,6 +192,19 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
     private static void checkRosterForm(Pokemon pokemon, String formName) {
         String label = pokemon.getSpecies().getName() + " " + formName;
         try {
+            // Cover each species' full level-up learnset, including required-form signature moves.
+            pokemon.setLevel(100);
+            for (var move : pokemon.getMoveSet()) {
+                move.setRaisedPpStages(2);
+                move.setCurrentPp(1);
+            }
+            pokemon.getBenchedMoves().clear();
+            for (var move : pokemon.getAllAccessibleMoves()) {
+                if (!pokemon.getMoveSet().getMoveTemplates().contains(move)) {
+                    pokemon.getBenchedMoves().add(new BenchedMove(move, 1));
+                }
+            }
+            MoveState moves = MoveState.of(pokemon);
             FormData mega = MegaEvolution.findFormByName(pokemon, formName);
             check(mega != null, "Missing form");
             String expectedAbility = mega.getAbilities().iterator().next().getTemplate().getName();
@@ -146,6 +219,7 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
             PokemonBattle battle = new PokemonBattle(BattleFormat.Companion.getGEN_9_SINGLES(),
                 new BattleSide(owner), new BattleSide());
             MegaEvolution.applyMega(pokemon, battle);
+            moves.checkUnchanged(pokemon);
             check(pokemon.getForm() == mega, "Wrong Mega form selected");
             check(pokemon.getGender() == originalGender, "Battle Mega changed gender");
             check(pokemon.getAbility().getName().equals(expectedAbility), "Wrong Mega ability");
@@ -153,8 +227,9 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
             CompoundTag battleSave = pokemon.saveToNBT(registries, new CompoundTag());
             MegaEvolution.revert(pokemon);
             checkRestored(pokemon, base, original, aspects);
+            moves.checkUnchanged(pokemon);
             check(pokemon.getGender() == originalGender, "Reversion changed gender");
-            checkReloadedRoster(battleSave, base, original, aspects);
+            checkReloadedRoster(battleSave, base, original, aspects, moves);
 
             boolean keyRequired = MegaCobbleConfig.get().requireKeyStone;
             MegaCobbleConfig.get().requireKeyStone = false;
@@ -164,10 +239,17 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
                 check(pokemon.getForm() == mega && pokemon.getAbility().getName().equals(expectedAbility),
                     "World Mega disagrees with battle Mega");
                 check(pokemon.getGender() == originalGender, "World Mega changed gender");
+                if (!pokemon.getSpecies().getRiding().getSeats().isEmpty()) {
+                    check(!pokemon.getForm().getRiding().getSeats().isEmpty(), "World Mega lost riding seats");
+                }
+                moves.checkUnchanged(pokemon);
+                pokemon.getMoveSet().getMoves().getFirst().setCurrentPp(0);
+                MoveState worldMoves = MoveState.of(pokemon);
                 CompoundTag worldSave = pokemon.saveToNBT(registries, new CompoundTag());
                 MegaEvolution.revertWorldMega(pokemon);
                 checkRestored(pokemon, base, original, aspects);
-                checkReloadedRoster(worldSave, base, original, aspects);
+                worldMoves.checkUnchanged(pokemon);
+                checkReloadedRoster(worldSave, base, original, aspects, worldMoves);
             } finally {
                 MegaCobbleConfig.get().requireKeyStone = keyRequired;
             }
@@ -186,10 +268,11 @@ public final class MegaAbilityIntegrationTest implements ModInitializer {
         check(pokemon.getNickname().getString().equals("Partner"), "Reversion lost the nickname");
     }
 
-    private static void checkReloadedRoster(CompoundTag saved, FormData base, Ability ability, java.util.Set<String> aspects) {
+    private static void checkReloadedRoster(CompoundTag saved, FormData base, Ability ability, java.util.Set<String> aspects, MoveState moves) {
         Pokemon loaded = new Pokemon().loadFromNBT(registries, saved);
         MegaEvolution.recoverOrphanedMega(loaded);
         checkRestored(loaded, base, ability, aspects);
+        moves.checkUnchanged(loaded);
     }
 
     private static void checkReload(String properties, boolean forced, boolean world) {

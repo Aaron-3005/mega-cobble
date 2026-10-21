@@ -90,7 +90,7 @@ jobs:
             gh api --method POST "repos/$GH_REPO/git/refs" \
               -f ref=refs/tags/latest-cobblemon-1.8 -f sha="$GITHUB_SHA"
           fi
-          printf 'Automatic Fabric build of commit `%s`. Requires Minecraft 1.21.1, Cobblemon 1.8.1, Fabric API and Fabric Language Kotlin.\n' "$GITHUB_SHA" > release-notes.md
+          printf 'Automatic Fabric build of commit `%s`. Requires Minecraft 1.21.1, Cobblemon 1.8.2, Fabric API and Fabric Language Kotlin.\n' "$GITHUB_SHA" > release-notes.md
           if gh release view latest-cobblemon-1.8 >/dev/null 2>&1; then
             gh release edit latest-cobblemon-1.8 --title 'Latest build (Cobblemon 1.8)' --prerelease --notes-file release-notes.md
             gh release upload latest-cobblemon-1.8 megacobble-latest-cobblemon-1.8.jar --clobber
@@ -115,6 +115,6 @@ jobs:
             fi
           else
             gh release create "$GITHUB_REF_NAME" "${jars[0]}" --verify-tag \
-              --title "$GITHUB_REF_NAME (Cobblemon 1.8.1)" --generate-notes --latest=false
+              --title "$GITHUB_REF_NAME (Cobblemon 1.8.2)" --generate-notes --latest=false
           fi
           printf '### Versioned release\n[%s](https://github.com/%s/releases/tag/%s)\n' "$GITHUB_REF_NAME" "$GH_REPO" "$GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
