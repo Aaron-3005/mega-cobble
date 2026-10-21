@@ -196,7 +196,7 @@
    "ability": "hugepower",
    "baseStats": {
     "hp": 60,
-    "attack": 140,
+    "attack": 100,
     "defence": 105,
     "special_attack": 130,
     "special_defence": 105,

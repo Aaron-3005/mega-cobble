@@ -7,6 +7,18 @@ ability audit, not a new verification of the original stats, types or visual for
 
 ## Assignment changes
 
+### Stat follow-up — 2026-10-21
+
+Version 0.2.2 corrects Mega Starmie's base Attack from 140 to 100, retaining Huge Power.
+The previous entry combined the Legends: Z-A stat line (660 total) with the Champions ability.
+The Champions stat line is **60 / 100 / 105 / 130 / 105 / 120**, totaling **620**.
+Sources: [Champions Pokédex](https://www.serebii.net/pokedex-champions/starmie/),
+[Legends: Z-A Pokédex](https://www.serebii.net/pokedex-sv/starmie/), and
+[pinned Showdown data](https://github.com/smogon/pokemon-showdown/blob/651b6fa8542bb75078fd66337ab150effe623d30/data/pokedex.ts#L2747).
+The six provisional ability assignments below remain unchanged.
+
+### Ability corrections — 2026-09-27
+
 | Mega | Previous placeholder | Current ability |
 | --- | --- | --- |
 | Garchomp Z | Sand Veil | Levitate |

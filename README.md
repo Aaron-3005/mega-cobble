@@ -361,6 +361,12 @@ and kept only as a local reference.
 
 Newest first.
 
+- **v0.2.2 — 2026-10-21: Mega Starmie stat correction.**
+  - Corrected Mega Starmie's base Attack from 140 to 100 while retaining Huge Power, matching
+    Pokémon Champions. Its base stat total is now 620 instead of 660; all other stats are unchanged.
+  - Requires Cobblemon 1.8.2 on Minecraft 1.21.1, as in v0.2.1.
+  - Verified: release build, 28 simulator test groups and the full 93-form Minecraft lifecycle suite.
+
 - **v0.2.1 — 2026-10-21: Cobblemon 1.8.2 compatibility.** Requires Cobblemon 1.8.2
   on Minecraft 1.21.1; use v0.2.0 for Cobblemon 1.8.1.
   - Reverts battle Megas through Cobblemon's new `BATTLE_ENDED` event, including stopped battles.

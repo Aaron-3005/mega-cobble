@@ -24,7 +24,7 @@ matching the installed Cobblemon line; both JARs use the same mod ID and must no
 ## Downloads and releases
 
 - Stable 1.7.3 line: [v0.1.3](https://github.com/Aaron-3005/mega-cobble/releases/tag/v0.1.3).
-- Cobblemon 1.8.2: [v0.2.1](https://github.com/Aaron-3005/mega-cobble/releases/tag/v0.2.1).
+- Cobblemon 1.8.2: [v0.2.2](https://github.com/Aaron-3005/mega-cobble/releases/tag/v0.2.2).
 - Stable 1.8.1 line: [v0.2.0](https://github.com/Aaron-3005/mega-cobble/releases/tag/v0.2.0).
 - Rolling 1.8 build: `latest-cobblemon-1.8` / `megacobble-latest-cobblemon-1.8.jar`.
 
@@ -55,6 +55,12 @@ the official Cobblemon release already bundles ICU for installed servers.
 All ability corrections, UI synchronization, persistent Mega recovery and classic/custom form tests
 from v0.1.3 are carried into this branch. The six provisional ability assignments and placeholder
 models documented in the [ability audit](mega-abilities-audit.md) remain limitations.
+
+## Verified for 0.2.2
+
+- Corrected Mega Starmie to 100 base Attack and Huge Power (620 total), matching Champions.
+- Release build, artifact validation, all 28 simulator test groups and the full Minecraft lifecycle
+  suite pass, including all 93 Mega forms and the focused ability/UI/reload checks.
 
 ## Verified for 0.2.1
 
